@@ -217,20 +217,22 @@ extension SingletonPlayerWebView {
         """, completionHandler: nil)
     }
 
-    /// Pause.
+    /// Pause with smooth audio volume fade out
     func pause() {
         guard let webView else { return }
 
-        let script = """
-            (function() {
-            window.__kasetAutoplayPending = false;
-            window.__kasetPlaybackSuppressed = true;
-                const video = document.querySelector('video');
-                if (video && !video.paused) { video.pause(); return 'paused'; }
-                return 'already-paused';
-            })();
-        """
-        webView.evaluateJavaScript(script, completionHandler: nil)
+        AudioFader.shared.fadeOut(webView: webView, duration: 1.0) { [weak self] in
+            let script = """
+                (function() {
+                    window.__kasetAutoplayPending = false;
+                    window.__kasetPlaybackSuppressed = true;
+                    const video = document.querySelector('video');
+                    if (video && !video.paused) { video.pause(); return 'paused'; }
+                    return 'already-paused';
+                })();
+            """
+            self?.webView?.evaluateJavaScript(script, completionHandler: nil)
+        }
     }
 
     /// Skip to next track.
