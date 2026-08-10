@@ -75,6 +75,10 @@ struct MusicSettingsView: View {
                 Text(String(localized: "Audio"))
             }
 
+            // MARK: - Audio Fading Section
+
+            AudioFadingSettingsSection(settings: self.settings)
+
             // MARK: - Lyrics Section
 
             Section {

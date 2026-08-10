@@ -51,6 +51,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     @State private var youtubeStore: YouTubeViewModelStore
 
     @State private var showLoginSheet = false
+    @State private var showSpotlightView = false
     @State private var isCommandBarPresented = false
     @State private var whatsNewToPresent: PresentedWhatsNew?
     @State private var selectedSidebarPinnedItem: SidebarPinnedItem?
@@ -166,6 +167,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         }
         .sheet(isPresented: self.$showLoginSheet) {
             LoginSheet()
+        }
+        .sheet(isPresented: self.$showSpotlightView) {
+            self.spotlightSheetView
         }
         .sheet(item: self.$whatsNewToPresent) { presentedWhatsNew in
             WhatsNewView(whatsNew: presentedWhatsNew.whatsNew) {
@@ -483,6 +487,26 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     private func presentCommandBarIfAvailable() {
         guard self.supportsCommandBarUI else { return }
         self.isCommandBarPresented = true
+    }
+
+    private var spotlightSheetView: some View {
+        NowPlayingSpotlightView(
+            song: self.playerService.currentTrack,
+            isPlaying: self.playerService.isPlaying,
+            progress: self.playerService.progress,
+            duration: self.playerService.duration,
+            volume: self.playerService.volume,
+            isMuted: self.playerService.isMuted,
+            queueSongs: self.playerService.queue,
+            lyricsText: nil,
+            onPlayPause: { Task { await self.playerService.playPause() } },
+            onSeek: { target in Task { await self.playerService.seek(to: target) } },
+            onNext: { Task { await self.playerService.next() } },
+            onPrevious: { Task { await self.playerService.previous() } },
+            onVolumeChange: { newVol in Task { await self.playerService.setVolume(newVol) } },
+            onToggleMute: { Task { await self.playerService.toggleMute() } },
+            onAirPlay: {}
+        )
     }
 
     private var supportsCommandBarUI: Bool {
