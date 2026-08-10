@@ -127,34 +127,34 @@ struct NowPlayingSpotlightView: View {
                 HStack(spacing: 20) {
                     Button(action: {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if self.isDrawerVisible && self.selectedDrawerTab == .lyrics {
+                            if self.isDrawerVisible, self.selectedDrawerTab == .lyrics {
                                 self.isDrawerVisible = false
                             } else {
                                 self.selectedDrawerTab = .lyrics
                                 self.isDrawerVisible = true
                             }
                         }
-                    }) {
+                    }, label: {
                         Label("Lyrics", systemImage: "quote.bubble.fill")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .lyrics ? Color.accentColor : Color.secondary)
-                    }
+                    })
                     .buttonStyle(.plain)
 
                     Button(action: {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if self.isDrawerVisible && self.selectedDrawerTab == .queue {
+                            if self.isDrawerVisible, self.selectedDrawerTab == .queue {
                                 self.isDrawerVisible = false
                             } else {
                                 self.selectedDrawerTab = .queue
                                 self.isDrawerVisible = true
                             }
                         }
-                    }) {
+                    }, label: {
                         Label("Queue (\(self.queueSongs.count))", systemImage: "list.bullet.rectangle.portrait.fill")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .queue ? Color.accentColor : Color.secondary)
-                    }
+                    })
                     .buttonStyle(.plain)
                 }
                 .padding(.bottom, 20)

@@ -1,5 +1,5 @@
-import SwiftUI
 import AVKit
+import SwiftUI
 
 /// Wireless AirPlay audio output target selection view for Spotlight mode.
 struct SpotlightAirPlayPickerView: View {
@@ -8,7 +8,7 @@ struct SpotlightAirPlayPickerView: View {
     @State private var availableRoutes: [AirPlayRoute] = [
         AirPlayRoute(id: "system", name: "MacBook Pro Speakers", isCurrent: true, type: .builtIn),
         AirPlayRoute(id: "homepod_living", name: "Living Room HomePod", isCurrent: false, type: .homePod),
-        AirPlayRoute(id: "airplay_tv", name: "Apple TV 4K", isCurrent: false, type: .appleTV)
+        AirPlayRoute(id: "airplay_tv", name: "Apple TV 4K", isCurrent: false, type: .appleTV),
     ]
 
     struct AirPlayRoute: Identifiable {
@@ -40,11 +40,11 @@ struct SpotlightAirPlayPickerView: View {
                 Text("Audio Output Target")
                     .font(.headline)
                 Spacer()
-                Button(action: { self.dismiss() }) {
+                Button(action: { self.dismiss() }, label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(.secondary)
-                }
+                })
                 .buttonStyle(.plain)
             }
             .padding([.top, .horizontal], 20)

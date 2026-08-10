@@ -1,6 +1,8 @@
 import Testing
 @testable import Kaset
 
+// MARK: - AudioFaderServiceTests
+
 @MainActor
 struct AudioFaderServiceTests {
     @Test("Default fader instance is accessible")
@@ -19,5 +21,7 @@ struct AudioFaderServiceTests {
 }
 
 extension AudioFaderService {
-    var idForTesting: String { "AudioFaderService.shared" }
+    var idForTesting: String {
+        "AudioFaderService.shared"
+    }
 }

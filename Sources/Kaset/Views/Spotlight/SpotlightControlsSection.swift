@@ -26,7 +26,7 @@ struct SpotlightControlsSection: View {
                         get: { self.progress },
                         set: { newValue in self.onSeek(newValue) }
                     ),
-                    in: 0...max(1, self.duration)
+                    in: 0 ... max(1, self.duration)
                 )
                 .tint(.primary)
 
@@ -45,43 +45,43 @@ struct SpotlightControlsSection: View {
             // Primary Playback Controls Bar
             HStack(spacing: 36) {
                 // Shuffle button toggle
-                Button(action: { self.isShuffleActive.toggle() }) {
+                Button(action: { self.isShuffleActive.toggle() }, label: {
                     Image(systemName: "shuffle")
                         .font(.system(size: 18, weight: self.isShuffleActive ? .bold : .regular))
                         .foregroundStyle(self.isShuffleActive ? Color.accentColor : Color.secondary)
-                }
+                })
                 .buttonStyle(.plain)
 
                 // Previous track
-                Button(action: self.onPrevious) {
+                Button(action: self.onPrevious, label: {
                     Image(systemName: "backward.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(.primary)
-                }
+                })
                 .buttonStyle(.plain)
 
                 // Play / Pause button
-                Button(action: self.onPlayPause) {
+                Button(action: self.onPlayPause, label: {
                     Image(systemName: self.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                         .font(.system(size: 64))
                         .foregroundStyle(.primary)
-                }
+                })
                 .buttonStyle(.plain)
 
                 // Next track
-                Button(action: self.onNext) {
+                Button(action: self.onNext, label: {
                     Image(systemName: "forward.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(.primary)
-                }
+                })
                 .buttonStyle(.plain)
 
                 // Repeat button toggle
-                Button(action: { self.repeatState = (self.repeatState + 1) % 3 }) {
+                Button(action: { self.repeatState = (self.repeatState + 1) % 3 }, label: {
                     Image(systemName: self.repeatState == 2 ? "repeat.1" : "repeat")
                         .font(.system(size: 18, weight: self.repeatState > 0 ? .bold : .regular))
                         .foregroundStyle(self.repeatState > 0 ? Color.accentColor : Color.secondary)
-                }
+                })
                 .buttonStyle(.plain)
             }
 
@@ -99,7 +99,7 @@ struct SpotlightControlsSection: View {
                         get: { self.isMuted ? 0.0 : self.volume },
                         set: { newValue in self.onVolumeChange(newValue) }
                     ),
-                    in: 0.0...1.0
+                    in: 0.0 ... 1.0
                 )
                 .tint(.primary)
                 .frame(width: 140)
@@ -113,7 +113,7 @@ struct SpotlightControlsSection: View {
     }
 
     private static func formatTime(_ time: TimeInterval) -> String {
-        guard time.isFinite && !time.isNaN else { return "0:00" }
+        guard time.isFinite, !time.isNaN else { return "0:00" }
         let totalSeconds = Int(max(0, time))
         let minutes = totalSeconds / 60
         let seconds = totalSeconds % 60

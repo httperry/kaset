@@ -11,7 +11,9 @@ final class AudioFaderService {
         case linear
         case logarithmic
 
-        var id: String { self.rawValue }
+        var id: String {
+            self.rawValue
+        }
 
         var displayName: String {
             switch self {

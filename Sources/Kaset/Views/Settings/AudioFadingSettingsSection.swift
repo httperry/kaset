@@ -31,7 +31,7 @@ struct AudioFadingSettingsSection: View {
 
                         Slider(
                             value: self.$settings.audioFadeDuration,
-                            in: 0.5...3.0,
+                            in: 0.5 ... 3.0,
                             step: 0.1
                         ) {
                             Text("Fade Duration")
