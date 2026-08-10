@@ -1,20 +1,27 @@
 import SwiftUI
 
-/// Now-Playing Spotlight presentation view with ambient artwork glow and interactive controls.
+/// Now-Playing Spotlight presentation view with ambient artwork glow, modular controls, and side drawer.
 struct NowPlayingSpotlightView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.colorScheme) private var colorScheme
 
     let song: Song?
     let isPlaying: Bool
     let progress: TimeInterval
     let duration: TimeInterval
+    let volume: Double
+    let isMuted: Bool
+    let queueSongs: [Song]
+    let lyricsText: String?
     let onPlayPause: () -> Void
     let onSeek: (TimeInterval) -> Void
     let onNext: () -> Void
     let onPrevious: () -> Void
+    let onVolumeChange: (Double) -> Void
+    let onToggleMute: () -> Void
+    let onAirPlay: () -> Void
 
-    @State private var isHoveringControls = false
+    @State private var isDrawerVisible = false
+    @State private var selectedDrawerTab: SpotlightSideDrawer.Tab = .lyrics
 
     var body: some View {
         ZStack {
@@ -24,131 +31,135 @@ struct NowPlayingSpotlightView: View {
                     sources: [artworkURL],
                     identity: self.song?.id,
                     targetSize: CGSize(width: 600, height: 600),
-                    width: 700,
-                    height: 700,
+                    width: 750,
+                    height: 750,
                     cornerRadius: 32
                 )
-                .opacity(0.65)
+                .opacity(0.70)
             }
 
-            VStack(spacing: 28) {
-                // Header dismiss button
-                HStack {
-                    Spacer()
-                    Button(action: { self.dismiss() }) {
-                        Image(systemName: "chevron.down.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding([.top, .trailing], 24)
+            VStack(spacing: 0) {
+                // Header Bar
+                SpotlightHeaderView(
+                    onDismiss: { self.dismiss() },
+                    onAirPlay: self.onAirPlay
+                )
 
-                Spacer()
+                Spacer(minLength: 16)
 
-                // Large Spotlight Album Artwork with Glow Frame
-                ZStack {
-                    if let artworkURL = self.song?.thumbnailURL {
-                        CachedAsyncImage(url: artworkURL) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            ProgressView()
-                        }
-                        .frame(width: 320, height: 320)
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .shadow(color: .black.opacity(0.35), radius: 24, x: 0, y: 12)
-                    } else {
+                // Main Content Body (Artwork + Metadata + Controls & Side Drawer)
+                HStack(spacing: 32) {
+                    VStack(spacing: 24) {
+                        // Spotlight Album Artwork
                         ZStack {
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(.quaternary)
-                                .frame(width: 320, height: 320)
+                            if let artworkURL = self.song?.thumbnailURL {
+                                CachedAsyncImage(url: artworkURL) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    ProgressView()
+                                }
+                                .frame(width: 280, height: 280)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .shadow(color: .black.opacity(0.40), radius: 24, x: 0, y: 12)
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(.quaternary)
+                                        .frame(width: 280, height: 280)
 
-                            Image(systemName: "music.note")
-                                .font(.system(size: 80))
-                                .foregroundStyle(.secondary)
+                                    Image(systemName: "music.note")
+                                        .font(.system(size: 80))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
+
+                        // Track Metadata Titles
+                        VStack(spacing: 6) {
+                            Text(self.song?.title ?? "No Track Playing")
+                                .font(.system(size: 24, weight: .bold))
+                                .lineLimit(1)
+
+                            Text(self.song?.artists.map(\.name).joined(separator: ", ") ?? "Unknown Artist")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+
+                            if let albumTitle = self.song?.album?.title {
+                                Text(albumTitle)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, 24)
+
+                        // Interactive Media Controls Section
+                        SpotlightControlsSection(
+                            isPlaying: self.isPlaying,
+                            progress: self.progress,
+                            duration: self.duration,
+                            volume: self.volume,
+                            isMuted: self.isMuted,
+                            onPlayPause: self.onPlayPause,
+                            onSeek: self.onSeek,
+                            onNext: self.onNext,
+                            onPrevious: self.onPrevious,
+                            onVolumeChange: self.onVolumeChange,
+                            onToggleMute: self.onToggleMute
+                        )
                     }
-                }
 
-                // Track Metadata Info
-                VStack(spacing: 8) {
-                    Text(self.song?.title ?? "No Track Playing")
-                        .font(.system(size: 26, weight: .bold))
-                        .lineLimit(1)
-                        .multilineTextAlignment(.center)
-
-                    Text(self.song?.artists.map(\.name).joined(separator: ", ") ?? "Unknown Artist")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-
-                    if let albumTitle = self.song?.album?.title {
-                        Text(albumTitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
-                }
-                .padding(.horizontal, 32)
-
-                // Scrubber Progress Lane
-                VStack(spacing: 6) {
-                    Slider(
-                        value: Binding(
-                            get: { self.progress },
-                            set: { newValue in self.onSeek(newValue) }
-                        ),
-                        in: 0...max(1, self.duration)
+                    // Side Drawer for Lyrics / Queue
+                    SpotlightSideDrawer(
+                        selectedTab: self.$selectedDrawerTab,
+                        isVisible: self.isDrawerVisible,
+                        lyricsText: self.lyricsText,
+                        queueSongs: self.queueSongs
                     )
-                    .tint(.primary)
-
-                    HStack {
-                        Text(Self.formatTime(self.progress))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("-" + Self.formatTime(max(0, self.duration - self.progress)))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
                 }
-                .padding(.horizontal, 48)
 
-                // Interactive Media Controls Bar
-                HStack(spacing: 40) {
-                    Button(action: self.onPrevious) {
-                        Image(systemName: "backward.fill")
-                            .font(.system(size: 24))
+                Spacer(minLength: 16)
+
+                // Footer Drawer Toggle Toolbar
+                HStack(spacing: 20) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if self.isDrawerVisible && self.selectedDrawerTab == .lyrics {
+                                self.isDrawerVisible = false
+                            } else {
+                                self.selectedDrawerTab = .lyrics
+                                self.isDrawerVisible = true
+                            }
+                        }
+                    }) {
+                        Label("Lyrics", systemImage: "quote.bubble.fill")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .lyrics ? Color.accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
 
-                    Button(action: self.onPlayPause) {
-                        Image(systemName: self.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                            .font(.system(size: 64))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(action: self.onNext) {
-                        Image(systemName: "forward.fill")
-                            .font(.system(size: 24))
+                    Button(action: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if self.isDrawerVisible && self.selectedDrawerTab == .queue {
+                                self.isDrawerVisible = false
+                            } else {
+                                self.selectedDrawerTab = .queue
+                                self.isDrawerVisible = true
+                            }
+                        }
+                    }) {
+                        Label("Queue (\(self.queueSongs.count))", systemImage: "list.bullet.rectangle.portrait.fill")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .queue ? Color.accentColor : Color.secondary)
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.bottom, 32)
-
-                Spacer()
+                .padding(.bottom, 20)
             }
         }
-        .frame(minWidth: 540, minHeight: 680)
-    }
-
-    private static func formatTime(_ time: TimeInterval) -> String {
-        guard time.isFinite && !time.isNaN else { return "0:00" }
-        let totalSeconds = Int(max(0, time))
-        let minutes = totalSeconds / 60
-        let seconds = totalSeconds % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        .frame(minWidth: 640, minHeight: 720)
     }
 }
