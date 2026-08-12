@@ -295,6 +295,10 @@ final class SingletonPlayerWebView {
     /// Used to restore polling after full-page navigation.
     var isLyricsPollActive = false
 
+    /// True while a fade-out is in progress. Prevents STATE_UPDATE callbacks
+    /// from re-invoking pause() on every timeupdate tick during the ramp.
+    var isFadeOutInProgress = false
+
     /// Last synced-lyrics line ranges supplied by the visible lyrics panel.
     /// Used by the reload fallback so polling does not restart with an empty range list.
     private var lastLyricsLineRanges: [[String: Int]] = []

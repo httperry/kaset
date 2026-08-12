@@ -209,6 +209,8 @@ extension SingletonPlayerWebView {
     /// Play (resume) with optional smooth audio fade in.
     func play() {
         guard let webView else { return }
+        // Clear any in-flight fade-out gate — an explicit play/resume overrides it.
+        self.isFadeOutInProgress = false
         let generation = self.documentGeneration.currentGeneration
         guard self.documentGeneration.accepts(generation: generation) else { return }
 
@@ -312,6 +314,10 @@ extension SingletonPlayerWebView {
     func pause() {
         guard let webView else { return }
 
+        // If a fade-out is already running, do nothing — the in-flight interval
+        // will complete and call video.pause() when the ramp finishes.
+        guard !self.isFadeOutInProgress else { return }
+
         let fadeEnabled = SettingsManager.shared.audioFadingEnabled
         let fadeDurationMs = Int(SettingsManager.shared.audioFadeDuration * 1000)
 
@@ -356,9 +362,16 @@ extension SingletonPlayerWebView {
                     return 'fading-out';
                 })();
             """
+            self.isFadeOutInProgress = true
             self.appendTraceLog("pause() fading out with durationMs: \(fadeDurationMs)")
             webView.evaluateJavaScript(script) { [weak self] res, err in
                 self?.appendTraceLog("pause() evaluated: \(String(describing: res)), error: \(String(describing: err))")
+                // Clear the gate after the full fade duration has elapsed.
+                let delay = (SettingsManager.shared.audioFadeDuration + 0.5)
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(delay))
+                    self?.isFadeOutInProgress = false
+                }
             }
         } else {
             let script = """
