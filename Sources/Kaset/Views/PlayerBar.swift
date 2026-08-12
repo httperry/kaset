@@ -37,7 +37,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
     @State private var resolvedAlbum: Playlist?
     @State private var isResolvingArtist = false
     @State private var isResolvingAlbum = false
-    @State private var showSpotlight = false
 
     /// Cached formatted progress string to avoid repeated formatting.
     @State private var formattedProgress: String = "0:00"
@@ -76,9 +75,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
             self.playerAreaFade
         }
         .zIndex(1)
-        .sheet(isPresented: self.$showSpotlight) {
-            self.spotlightPresentationView
-        }
         .task(id: self.currentTitleIdentity) {
             await self.prepareCurrentNavigationTargets()
         }
@@ -162,14 +158,20 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
     @ViewBuilder
     private var thumbnailView: some View {
         if let track = self.playerService.currentTrack {
-            Button {
-                self.showSpotlight = true
-            } label: {
+            if self.canOpenCurrentAlbum {
+                Button {
+                    self.openCurrentAlbum()
+                } label: {
+                    self.trackArtwork(for: track)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(AccessibilityID.PlayerBar.thumbnail)
+                .accessibilityLabel(Text(String(localized: "Go to Album")))
+            } else {
                 self.trackArtwork(for: track)
+                    .accessibilityIdentifier(AccessibilityID.PlayerBar.thumbnail)
+                    .accessibilityLabel(Text(String(localized: "Go to Album")))
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier(AccessibilityID.PlayerBar.thumbnail)
-            .accessibilityLabel(Text(String(localized: "Open Spotlight View")))
         } else {
             PlayerBarArtworkView(
                 width: 32,
@@ -201,26 +203,6 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         ) {
             SongThumbnailView(song: track, size: 32, cornerRadius: 6)
         }
-    }
-
-    private var spotlightPresentationView: some View {
-        NowPlayingSpotlightView(
-            song: self.playerService.currentTrack,
-            isPlaying: self.playerService.isPlaying,
-            progress: self.playerService.progress,
-            duration: self.playerService.duration,
-            volume: self.playerService.volume,
-            isMuted: self.playerService.isMuted,
-            queueSongs: self.playerService.queue,
-            lyricsText: nil,
-            onPlayPause: { Task { await self.playerService.playPause() } },
-            onSeek: { target in Task { await self.playerService.seek(to: target) } },
-            onNext: { Task { await self.playerService.next() } },
-            onPrevious: { Task { await self.playerService.previous() } },
-            onVolumeChange: { newVol in Task { await self.playerService.setVolume(newVol) } },
-            onToggleMute: { Task { await self.playerService.toggleMute() } },
-            onAirPlay: {}
-        )
     }
 
     private func artworkGlowSources(for track: Song) -> [URL] {
