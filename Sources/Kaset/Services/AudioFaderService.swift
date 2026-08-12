@@ -46,20 +46,36 @@ final class AudioFaderService {
             return
         }
 
-        self.cancelActiveFade()
-        self.currentStep = 0
-        self.totalSteps = max(10, Int(duration * 20))
-        self.initialVolume = 1.0
-        self.targetVolume = 0.0
-        self.isFadeOut = true
-        self.curve = curve
-        self.onComplete = completion
-
-        let stepInterval = duration / Double(self.totalSteps)
-
-        self.activeTimer = Timer.scheduledTimer(withTimeInterval: stepInterval, repeats: true) { [weak webView] _ in
+        let durationMs = Int(duration * 1000)
+        let exponent = curve == .logarithmic ? 2.0 : 1.0
+        let script = """
+            (function() {
+                const video = document.querySelector('video');
+                if (!video) return;
+                if (window.__kasetFadeInterval) {
+                    clearInterval(window.__kasetFadeInterval);
+                    window.__kasetFadeInterval = null;
+                }
+                const startVol = video.volume;
+                const durationMs = \(durationMs);
+                const startTime = performance.now();
+                window.__kasetFadeInterval = setInterval(() => {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(1.0, elapsed / durationMs);
+                    const factor = Math.pow(progress, \(exponent));
+                    video.volume = Math.max(0.0, startVol * (1.0 - factor));
+                    if (progress >= 1.0) {
+                        clearInterval(window.__kasetFadeInterval);
+                        window.__kasetFadeInterval = null;
+                        video.volume = 0.0;
+                    }
+                }, 16);
+            })();
+        """
+        webView.evaluateJavaScript(script) { _, _ in
             Task { @MainActor in
-                AudioFaderService.shared.performFadeStep(webView: webView)
+                try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+                completion?()
             }
         }
     }
@@ -77,20 +93,38 @@ final class AudioFaderService {
             return
         }
 
-        self.cancelActiveFade()
-        self.currentStep = 0
-        self.totalSteps = max(10, Int(duration * 20))
-        self.initialVolume = 0.0
-        self.targetVolume = max(0.0, min(1.0, targetVolume))
-        self.isFadeOut = false
-        self.curve = curve
-        self.onComplete = completion
-
-        let stepInterval = duration / Double(self.totalSteps)
-
-        self.activeTimer = Timer.scheduledTimer(withTimeInterval: stepInterval, repeats: true) { [weak webView] _ in
+        let durationMs = Int(duration * 1000)
+        let exponent = curve == .logarithmic ? 2.0 : 1.0
+        let target = max(0.0, min(1.0, targetVolume))
+        let script = """
+            (function() {
+                const video = document.querySelector('video');
+                if (!video) return;
+                if (window.__kasetFadeInterval) {
+                    clearInterval(window.__kasetFadeInterval);
+                    window.__kasetFadeInterval = null;
+                }
+                video.volume = 0.0;
+                const durationMs = \(durationMs);
+                const targetVol = \(target);
+                const startTime = performance.now();
+                window.__kasetFadeInterval = setInterval(() => {
+                    const elapsed = performance.now() - startTime;
+                    const progress = Math.min(1.0, elapsed / durationMs);
+                    const factor = Math.pow(progress, \(exponent));
+                    video.volume = Math.min(targetVol, targetVol * factor);
+                    if (progress >= 1.0) {
+                        clearInterval(window.__kasetFadeInterval);
+                        window.__kasetFadeInterval = null;
+                        video.volume = targetVol;
+                    }
+                }, 16);
+            })();
+        """
+        webView.evaluateJavaScript(script) { _, _ in
             Task { @MainActor in
-                AudioFaderService.shared.performFadeStep(webView: webView)
+                try? await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+                completion?()
             }
         }
     }

@@ -144,14 +144,43 @@ extension SingletonPlayerWebView {
         let generation = self.documentGeneration.currentGeneration
         guard self.documentGeneration.accepts(generation: generation) else { return }
 
-        let script = """
-            if (window.__kasetDocumentGeneration === \(generation)) {
-                \(Self.playPauseCommandScript)
+        let fadeEnabled = SettingsManager.shared.audioFadingEnabled
+        let fadeDuration = SettingsManager.shared.audioFadeDuration
+
+        if fadeEnabled {
+            let script = """
+                (function() {
+                    const video = document.querySelector('video');
+                    if (!video) return 'no-video';
+                    if (video.paused) {
+                        return 'is-paused';
+                    } else {
+                        return 'is-playing';
+                    }
+                })();
+            """
+            webView.evaluateJavaScript(script) { [weak self] result, _ in
+                guard let self else { return }
+                if let status = result as? String {
+                    if status == "is-paused" {
+                        self.play()
+                    } else {
+                        self.pause()
+                    }
+                } else {
+                    self.play()
+                }
             }
-        """
-        webView.evaluateJavaScript(script) { [weak self] _, error in
-            if let error {
-                self?.logger.error("playPause error: \(error.localizedDescription)")
+        } else {
+            let script = """
+                if (window.__kasetDocumentGeneration === \(generation)) {
+                    \(Self.playPauseCommandScript)
+                }
+            """
+            webView.evaluateJavaScript(script) { [weak self] _, error in
+                if let error {
+                    self?.logger.error("playPause error: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -177,16 +206,63 @@ extension SingletonPlayerWebView {
         """
     }
 
-    /// Play (resume).
+    /// Play (resume) with optional smooth audio fade in.
     func play() {
         guard let webView else { return }
         let generation = self.documentGeneration.currentGeneration
         guard self.documentGeneration.accepts(generation: generation) else { return }
-        webView.evaluateJavaScript("""
-            if (window.__kasetDocumentGeneration === \(generation)) {
+
+        let fadeEnabled = SettingsManager.shared.audioFadingEnabled
+        let fadeDurationMs = Int(SettingsManager.shared.audioFadeDuration * 1000)
+
+        if fadeEnabled {
+            let script = """
+                (function() {
+                    if (window.__kasetDocumentGeneration !== \(generation)) return 'stale';
+                    window.__kasetAutoplayPending = true;
+                    window.__kasetPlaybackSuppressed = false;
+                    const video = document.querySelector('video');
+                    if (!video) return 'no-video';
+
+                    if (window.__kasetFadeInterval) {
+                        clearInterval(window.__kasetFadeInterval);
+                        window.__kasetFadeInterval = null;
+                    }
+
+                    video.volume = 0.0;
+                    video.play();
+
+                    const durationMs = \(fadeDurationMs);
+                    const startTime = performance.now();
+
+                    window.__kasetFadeInterval = setInterval(() => {
+                        const elapsed = performance.now() - startTime;
+                        const progress = Math.min(1.0, elapsed / durationMs);
+                        const factor = Math.pow(progress, 2);
+                        video.volume = Math.min(1.0, factor);
+
+                        if (progress >= 1.0) {
+                            clearInterval(window.__kasetFadeInterval);
+                            window.__kasetFadeInterval = null;
+                            video.volume = 1.0;
+                        }
+                    }, 16);
+
+                    return 'fading-in';
+                })();
+            """
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        } else {
+            let script = """
+                (function() {
+                    if (window.__kasetDocumentGeneration !== \(generation)) return 'stale';
+                    const video = document.querySelector('video');
+                    if (video) video.volume = 1.0;
+                })();
                 \(Self.playCommandScript)
-            }
-        """, completionHandler: nil)
+            """
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        }
     }
 
     /// During restored playback, a paused preroll ad must advance before the
@@ -217,11 +293,48 @@ extension SingletonPlayerWebView {
         """, completionHandler: nil)
     }
 
-    /// Pause with smooth audio volume fade out
+    /// Pause with smooth in-browser audio volume fade out.
     func pause() {
         guard let webView else { return }
 
-        AudioFader.shared.fadeOut(webView: webView, duration: 1.0) { [weak self] in
+        let fadeEnabled = SettingsManager.shared.audioFadingEnabled
+        let fadeDurationMs = Int(SettingsManager.shared.audioFadeDuration * 1000)
+
+        if fadeEnabled {
+            let script = """
+                (function() {
+                    const video = document.querySelector('video');
+                    if (!video || video.paused) return 'already-paused';
+
+                    if (window.__kasetFadeInterval) {
+                        clearInterval(window.__kasetFadeInterval);
+                        window.__kasetFadeInterval = null;
+                    }
+
+                    const startVol = video.volume;
+                    const durationMs = \(fadeDurationMs);
+                    const startTime = performance.now();
+
+                    window.__kasetFadeInterval = setInterval(() => {
+                        const elapsed = performance.now() - startTime;
+                        const progress = Math.min(1.0, elapsed / durationMs);
+                        const factor = Math.pow(progress, 2);
+                        video.volume = Math.max(0.0, startVol * (1.0 - factor));
+
+                        if (progress >= 1.0) {
+                            clearInterval(window.__kasetFadeInterval);
+                            window.__kasetFadeInterval = null;
+                            video.pause();
+                            window.__kasetAutoplayPending = false;
+                            window.__kasetPlaybackSuppressed = true;
+                        }
+                    }, 16);
+
+                    return 'fading-out';
+                })();
+            """
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        } else {
             let script = """
                 (function() {
                     window.__kasetAutoplayPending = false;
@@ -231,7 +344,7 @@ extension SingletonPlayerWebView {
                     return 'already-paused';
                 })();
             """
-            self?.webView?.evaluateJavaScript(script, completionHandler: nil)
+            webView.evaluateJavaScript(script, completionHandler: nil)
         }
     }
 
