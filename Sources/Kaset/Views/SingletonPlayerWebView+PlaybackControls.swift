@@ -230,7 +230,17 @@ extension SingletonPlayerWebView {
                     }
 
                     video.volume = 0.0;
-                    video.play();
+                    const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
+                    if (playBtn && video.paused) {
+                        playBtn.click();
+                    } else if (video.paused) {
+                        const moviePlayer = document.getElementById('movie_player');
+                        if (moviePlayer && typeof moviePlayer.playVideo === 'function') {
+                            moviePlayer.playVideo();
+                        } else {
+                            video.play();
+                        }
+                    }
 
                     const durationMs = \(fadeDurationMs);
                     const startTime = performance.now();
@@ -324,9 +334,20 @@ extension SingletonPlayerWebView {
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);
                             window.__kasetFadeInterval = null;
-                            video.pause();
                             window.__kasetAutoplayPending = false;
                             window.__kasetPlaybackSuppressed = true;
+
+                            const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
+                            if (playBtn && !video.paused) {
+                                playBtn.click();
+                            } else {
+                                const moviePlayer = document.getElementById('movie_player');
+                                if (moviePlayer && typeof moviePlayer.pauseVideo === 'function') {
+                                    moviePlayer.pauseVideo();
+                                } else {
+                                    video.pause();
+                                }
+                            }
                         }
                     }, 16);
 
