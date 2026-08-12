@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Now-Playing Spotlight presentation view with ambient artwork glow, modular controls, and side drawer.
+/// Now-Playing Spotlight presentation view featuring a side-by-side layout:
+/// large album artwork on the left and track details, artist links, and controls on the right.
 struct NowPlayingSpotlightView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -30,27 +31,27 @@ struct NowPlayingSpotlightView: View {
                 PlayerBarArtworkGlow(
                     sources: [artworkURL],
                     identity: self.song?.id,
-                    targetSize: CGSize(width: 600, height: 600),
-                    width: 750,
-                    height: 750,
-                    cornerRadius: 32
+                    targetSize: CGSize(width: 800, height: 800),
+                    width: 950,
+                    height: 950,
+                    cornerRadius: 48
                 )
-                .opacity(0.70)
+                .opacity(0.65)
             }
 
             VStack(spacing: 0) {
-                // Header Bar
+                // Header Bar with Dismiss & AirPlay
                 SpotlightHeaderView(
                     onDismiss: { self.dismiss() },
                     onAirPlay: self.onAirPlay
                 )
 
-                Spacer(minLength: 16)
+                Spacer(minLength: 20)
 
-                // Main Content Body (Artwork + Metadata + Controls & Side Drawer)
-                HStack(spacing: 32) {
-                    VStack(spacing: 24) {
-                        // Spotlight Album Artwork
+                // Side-by-Side Split View
+                HStack(alignment: .center, spacing: 48) {
+                    // Left Column: Prominent Large Cover Artwork
+                    VStack {
                         ZStack {
                             if let artworkURL = self.song?.thumbnailURL {
                                 CachedAsyncImage(url: artworkURL) { image in
@@ -60,43 +61,64 @@ struct NowPlayingSpotlightView: View {
                                 } placeholder: {
                                     ProgressView()
                                 }
-                                .frame(width: 280, height: 280)
-                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                                .shadow(color: .black.opacity(0.40), radius: 24, x: 0, y: 12)
+                                .frame(width: 380, height: 380)
+                                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                                .shadow(color: .black.opacity(0.45), radius: 32, x: 0, y: 16)
                             } else {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 24, style: .continuous)
                                         .fill(.quaternary)
-                                        .frame(width: 280, height: 280)
+                                        .frame(width: 380, height: 380)
 
                                     Image(systemName: "music.note")
-                                        .font(.system(size: 80))
+                                        .font(.system(size: 100))
                                         .foregroundStyle(.secondary)
                                 }
                             }
                         }
+                    }
+                    .frame(maxWidth: 420)
 
-                        // Track Metadata Titles
-                        VStack(spacing: 6) {
+                    // Right Column: Title, Singer Details, Playback Controls & Drawer
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Track & Artist Information
+                        VStack(alignment: .leading, spacing: 8) {
                             Text(self.song?.title ?? "No Track Playing")
-                                .font(.system(size: 24, weight: .bold))
-                                .lineLimit(1)
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .lineLimit(2)
+                                .foregroundStyle(.primary)
 
-                            Text(self.song?.artists.map(\.name).joined(separator: ", ") ?? "Unknown Artist")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            // Singer / Artists
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.tint)
 
-                            if let albumTitle = self.song?.album?.title {
-                                Text(albumTitle)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.tertiary)
+                                Text(self.song?.artists.map(\.name).joined(separator: ", ") ?? "Unknown Artist")
+                                    .font(.title2.weight(.medium))
+                                    .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
-                        }
-                        .padding(.horizontal, 24)
 
-                        // Interactive Media Controls Section
+                            if let albumTitle = self.song?.album?.title {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "square.stack.fill")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.tertiary)
+
+                                    Text(albumTitle)
+                                        .font(.headline)
+                                        .foregroundStyle(.tertiary)
+                                        .lineLimit(1)
+                                }
+                                .padding(.top, 2)
+                            }
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        // Interactive Scrubber & Controls
                         SpotlightControlsSection(
                             isPlaying: self.isPlaying,
                             progress: self.progress,
@@ -110,56 +132,70 @@ struct NowPlayingSpotlightView: View {
                             onVolumeChange: self.onVolumeChange,
                             onToggleMute: self.onToggleMute
                         )
+
+                        // Drawer Options Toggle Bar (Lyrics & Queue)
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    if self.isDrawerVisible, self.selectedDrawerTab == .lyrics {
+                                        self.isDrawerVisible = false
+                                    } else {
+                                        self.selectedDrawerTab = .lyrics
+                                        self.isDrawerVisible = true
+                                    }
+                                }
+                            }, label: {
+                                Label("Lyrics", systemImage: "quote.bubble.fill")
+                                    .font(.headline.weight(.medium))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(self.isDrawerVisible && self.selectedDrawerTab == .lyrics ? Color.accentColor.opacity(0.2) : Color.clear)
+                                    .clipShape(Capsule())
+                                    .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .lyrics ? Color.accentColor : Color.secondary)
+                            })
+                            .buttonStyle(.plain)
+
+                            Button(action: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    if self.isDrawerVisible, self.selectedDrawerTab == .queue {
+                                        self.isDrawerVisible = false
+                                    } else {
+                                        self.selectedDrawerTab = .queue
+                                        self.isDrawerVisible = true
+                                    }
+                                }
+                            }, label: {
+                                Label("Up Next (\(self.queueSongs.count))", systemImage: "list.bullet.rectangle.portrait.fill")
+                                    .font(.headline.weight(.medium))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 8)
+                                    .background(self.isDrawerVisible && self.selectedDrawerTab == .queue ? Color.accentColor.opacity(0.2) : Color.clear)
+                                    .clipShape(Capsule())
+                                    .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .queue ? Color.accentColor : Color.secondary)
+                            })
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.top, 4)
+
+                        // Embedded Lyrics / Queue Panel if active
+                        if self.isDrawerVisible {
+                            SpotlightSideDrawer(
+                                selectedTab: self.$selectedDrawerTab,
+                                isVisible: self.isDrawerVisible,
+                                lyricsText: self.lyricsText,
+                                queueSongs: self.queueSongs
+                            )
+                            .frame(maxHeight: 220)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
-
-                    // Side Drawer for Lyrics / Queue
-                    SpotlightSideDrawer(
-                        selectedTab: self.$selectedDrawerTab,
-                        isVisible: self.isDrawerVisible,
-                        lyricsText: self.lyricsText,
-                        queueSongs: self.queueSongs
-                    )
+                    .frame(maxWidth: 480)
                 }
+                .padding(.horizontal, 40)
 
-                Spacer(minLength: 16)
-
-                // Footer Drawer Toggle Toolbar
-                HStack(spacing: 20) {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if self.isDrawerVisible, self.selectedDrawerTab == .lyrics {
-                                self.isDrawerVisible = false
-                            } else {
-                                self.selectedDrawerTab = .lyrics
-                                self.isDrawerVisible = true
-                            }
-                        }
-                    }, label: {
-                        Label("Lyrics", systemImage: "quote.bubble.fill")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .lyrics ? Color.accentColor : Color.secondary)
-                    })
-                    .buttonStyle(.plain)
-
-                    Button(action: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if self.isDrawerVisible, self.selectedDrawerTab == .queue {
-                                self.isDrawerVisible = false
-                            } else {
-                                self.selectedDrawerTab = .queue
-                                self.isDrawerVisible = true
-                            }
-                        }
-                    }, label: {
-                        Label("Queue (\(self.queueSongs.count))", systemImage: "list.bullet.rectangle.portrait.fill")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(self.isDrawerVisible && self.selectedDrawerTab == .queue ? Color.accentColor : Color.secondary)
-                    })
-                    .buttonStyle(.plain)
-                }
-                .padding(.bottom, 20)
+                Spacer(minLength: 24)
             }
         }
-        .frame(minWidth: 640, minHeight: 720)
+        .frame(minWidth: 880, minHeight: 600)
     }
 }
