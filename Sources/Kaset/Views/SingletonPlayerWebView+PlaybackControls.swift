@@ -321,6 +321,10 @@ extension SingletonPlayerWebView {
                     const video = document.querySelector('video');
                     if (!video || video.paused) return 'already-paused';
 
+                    // Set suppression flags immediately so autoplay recovery cannot
+                    // intervene at any point during the volume ramp (even on canplay).
+                    window.__kasetAutoplayPending = false;
+                    window.__kasetPlaybackSuppressed = true;
                     window.__kasetIsSettingVolume = true;
                     if (window.__kasetFadeInterval) {
                         clearInterval(window.__kasetFadeInterval);
@@ -340,16 +344,10 @@ extension SingletonPlayerWebView {
                             clearInterval(window.__kasetFadeInterval);
                             window.__kasetFadeInterval = null;
                             window.__kasetIsSettingVolume = false;
-                            window.__kasetAutoplayPending = false;
-                            window.__kasetPlaybackSuppressed = true;
 
                             const moviePlayer = document.getElementById('movie_player');
-                            const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
-
                             if (moviePlayer && typeof moviePlayer.pauseVideo === 'function') {
                                 moviePlayer.pauseVideo();
-                            } else if (playBtn && !video.paused) {
-                                playBtn.click();
                             }
                             video.pause();
                         }

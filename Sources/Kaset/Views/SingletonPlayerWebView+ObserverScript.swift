@@ -264,7 +264,7 @@ extension SingletonPlayerWebView {
                         window.__kasetAutoplayAttempts = 0;
                         window.__kasetAutoplayRetryScheduled = false;
                         bindVideoIdentity(video, !mediaVideoId);
-                        enforceVolumeNow();
+                        if (!window.__kasetFadeInterval && !window.__kasetIsSettingVolume) enforceVolumeNow();
                         restartLyricsPoll(false);
                     });
                     video.addEventListener('pause', stopPolling);
@@ -350,9 +350,9 @@ extension SingletonPlayerWebView {
                         bindVideoIdentity(video, true);
                         enforceVolumeNow();
                     });
-                    video.addEventListener('loadeddata', () => enforceVolumeNow());
+                    video.addEventListener('loadeddata', () => { if (!window.__kasetFadeInterval && !window.__kasetIsSettingVolume) enforceVolumeNow(); });
                     function recoverAutoplayIfNeeded() {
-                        enforceVolumeNow();
+                        if (!window.__kasetFadeInterval && !window.__kasetIsSettingVolume) enforceVolumeNow();
                         // Autoplay recovery: YTM sometimes leaves the video paused
                         // after navigation even with the WebKit autoplay allowance.
                         const btn = document.querySelector('.play-pause-button.ytmusic-player-bar');
@@ -373,9 +373,10 @@ extension SingletonPlayerWebView {
                     // Startup enforcement burst: YouTube may reset volume up to ~2s after
                     // playback starts (via internal player init, quality switching, etc.).
                     // Enforce every 200ms for the first 3 seconds to catch delayed resets.
+                    // Skip during an active Kaset fade to avoid fighting our ramp.
                     let burstCount = 0;
                     const burstInterval = setInterval(() => {
-                        enforceVolumeNow();
+                        if (!window.__kasetFadeInterval && !window.__kasetIsSettingVolume) enforceVolumeNow();
                         if (++burstCount >= 15) clearInterval(burstInterval);
                     }, 200);
 
