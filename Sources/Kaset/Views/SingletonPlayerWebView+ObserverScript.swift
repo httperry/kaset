@@ -340,6 +340,7 @@ extension SingletonPlayerWebView {
                     video.addEventListener('volumechange', () => {
                         if (isEnforcingVolume) return;
                         if (window.__kasetIsSettingVolume) return;
+                        if (window.__kasetFadeInterval) return;
                         enforceVolumeNow();
                     });
 

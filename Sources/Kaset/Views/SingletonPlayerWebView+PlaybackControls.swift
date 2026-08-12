@@ -224,22 +224,22 @@ extension SingletonPlayerWebView {
                     const video = document.querySelector('video');
                     if (!video) return 'no-video';
 
+                    window.__kasetIsSettingVolume = true;
                     if (window.__kasetFadeInterval) {
                         clearInterval(window.__kasetFadeInterval);
                         window.__kasetFadeInterval = null;
                     }
 
                     video.volume = 0.0;
+                    const moviePlayer = document.getElementById('movie_player');
+                    if (moviePlayer && typeof moviePlayer.playVideo === 'function') {
+                        moviePlayer.playVideo();
+                    }
                     const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
                     if (playBtn && video.paused) {
                         playBtn.click();
                     } else if (video.paused) {
-                        const moviePlayer = document.getElementById('movie_player');
-                        if (moviePlayer && typeof moviePlayer.playVideo === 'function') {
-                            moviePlayer.playVideo();
-                        } else {
-                            video.play();
-                        }
+                        video.play();
                     }
 
                     const durationMs = \(fadeDurationMs);
@@ -254,6 +254,7 @@ extension SingletonPlayerWebView {
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);
                             window.__kasetFadeInterval = null;
+                            window.__kasetIsSettingVolume = false;
                             video.volume = 1.0;
                         }
                     }, 16);
@@ -261,7 +262,10 @@ extension SingletonPlayerWebView {
                     return 'fading-in';
                 })();
             """
-            webView.evaluateJavaScript(script, completionHandler: nil)
+            self.appendTraceLog("play() fading in with durationMs: \(fadeDurationMs)")
+            webView.evaluateJavaScript(script) { [weak self] res, err in
+                self?.appendTraceLog("play() evaluated: \(String(describing: res)), error: \(String(describing: err))")
+            }
         } else {
             let script = """
                 (function() {
@@ -271,6 +275,7 @@ extension SingletonPlayerWebView {
                 })();
                 \(Self.playCommandScript)
             """
+            self.appendTraceLog("play() standard non-fading resume")
             webView.evaluateJavaScript(script, completionHandler: nil)
         }
     }
@@ -316,6 +321,7 @@ extension SingletonPlayerWebView {
                     const video = document.querySelector('video');
                     if (!video || video.paused) return 'already-paused';
 
+                    window.__kasetIsSettingVolume = true;
                     if (window.__kasetFadeInterval) {
                         clearInterval(window.__kasetFadeInterval);
                         window.__kasetFadeInterval = null;
@@ -334,19 +340,20 @@ extension SingletonPlayerWebView {
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);
                             window.__kasetFadeInterval = null;
+                            window.__kasetIsSettingVolume = false;
                             window.__kasetAutoplayPending = false;
                             window.__kasetPlaybackSuppressed = true;
 
+                            const moviePlayer = document.getElementById('movie_player');
+                            if (moviePlayer && typeof moviePlayer.pauseVideo === 'function') {
+                                moviePlayer.pauseVideo();
+                            }
                             const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
                             if (playBtn && !video.paused) {
                                 playBtn.click();
-                            } else {
-                                const moviePlayer = document.getElementById('movie_player');
-                                if (moviePlayer && typeof moviePlayer.pauseVideo === 'function') {
-                                    moviePlayer.pauseVideo();
-                                } else {
-                                    video.pause();
-                                }
+                            }
+                            if (!video.paused) {
+                                video.pause();
                             }
                         }
                     }, 16);
@@ -354,7 +361,10 @@ extension SingletonPlayerWebView {
                     return 'fading-out';
                 })();
             """
-            webView.evaluateJavaScript(script, completionHandler: nil)
+            self.appendTraceLog("pause() fading out with durationMs: \(fadeDurationMs)")
+            webView.evaluateJavaScript(script) { [weak self] res, err in
+                self?.appendTraceLog("pause() evaluated: \(String(describing: res)), error: \(String(describing: err))")
+            }
         } else {
             let script = """
                 (function() {
@@ -365,7 +375,24 @@ extension SingletonPlayerWebView {
                     return 'already-paused';
                 })();
             """
+            self.appendTraceLog("pause() standard non-fading pause")
             webView.evaluateJavaScript(script, completionHandler: nil)
+        }
+    }
+
+    private func appendTraceLog(_ message: String) {
+        let path = NSTemporaryDirectory() + "kaset_trace.log"
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(timestamp)] \(message)\n"
+        if let data = line.data(using: .utf8) {
+            if let handle = FileHandle(forWritingAtPath: path) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                try? handle.synchronize()
+                try? handle.close()
+            } else {
+                try? data.write(to: URL(fileURLWithPath: path), options: .atomic)
+            }
         }
     }
 
