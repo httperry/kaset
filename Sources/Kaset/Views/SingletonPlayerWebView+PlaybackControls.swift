@@ -232,24 +232,24 @@ extension SingletonPlayerWebView {
 
                     video.volume = 0.0;
                     const moviePlayer = document.getElementById('movie_player');
+                    const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
+
                     if (moviePlayer && typeof moviePlayer.playVideo === 'function') {
                         moviePlayer.playVideo();
-                    }
-                    const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
-                    if (playBtn && video.paused) {
+                    } else if (playBtn && video.paused) {
                         playBtn.click();
-                    } else if (video.paused) {
+                    }
+                    if (video.paused) {
                         video.play();
                     }
 
-                    const durationMs = \(fadeDurationMs);
+                    const durationMs = Math.max(300, \(fadeDurationMs));
                     const startTime = performance.now();
 
                     window.__kasetFadeInterval = setInterval(() => {
                         const elapsed = performance.now() - startTime;
                         const progress = Math.min(1.0, elapsed / durationMs);
-                        const factor = Math.pow(progress, 2);
-                        video.volume = Math.min(1.0, factor);
+                        video.volume = Math.min(1.0, progress);
 
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);
@@ -328,14 +328,13 @@ extension SingletonPlayerWebView {
                     }
 
                     const startVol = video.volume;
-                    const durationMs = \(fadeDurationMs);
+                    const durationMs = Math.max(300, \(fadeDurationMs));
                     const startTime = performance.now();
 
                     window.__kasetFadeInterval = setInterval(() => {
                         const elapsed = performance.now() - startTime;
                         const progress = Math.min(1.0, elapsed / durationMs);
-                        const factor = Math.pow(progress, 2);
-                        video.volume = Math.max(0.0, startVol * (1.0 - factor));
+                        video.volume = Math.max(0.0, startVol * (1.0 - progress));
 
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);
@@ -345,16 +344,14 @@ extension SingletonPlayerWebView {
                             window.__kasetPlaybackSuppressed = true;
 
                             const moviePlayer = document.getElementById('movie_player');
+                            const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
+
                             if (moviePlayer && typeof moviePlayer.pauseVideo === 'function') {
                                 moviePlayer.pauseVideo();
-                            }
-                            const playBtn = document.querySelector('.play-pause-button.ytmusic-player-bar');
-                            if (playBtn && !video.paused) {
+                            } else if (playBtn && !video.paused) {
                                 playBtn.click();
                             }
-                            if (!video.paused) {
-                                video.pause();
-                            }
+                            video.pause();
                         }
                     }, 16);
 
