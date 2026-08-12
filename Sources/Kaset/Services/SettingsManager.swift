@@ -548,7 +548,7 @@ final class SettingsManager {
         self.ambientBackdropEnabled = UserDefaults.standard.object(forKey: Keys.ambientBackdropEnabled) as? Bool ?? true
         self.popOutVideoOnNavigateAway = UserDefaults.standard.object(forKey: Keys.popOutVideoOnNavigateAway) as? Bool ?? true
         self.audioFadingEnabled = UserDefaults.standard.object(forKey: Keys.audioFadingEnabled) as? Bool ?? true
-        self.audioFadeDuration = UserDefaults.standard.object(forKey: Keys.audioFadeDuration) as? Double ?? 1.0
+        self.audioFadeDuration = UserDefaults.standard.object(forKey: Keys.audioFadeDuration) as? Double ?? 0.5
         #if DEBUG
             self.useLegacyMacOS15UI = UserDefaults.standard.object(forKey: Keys.useLegacyMacOS15UI) as? Bool ?? false
         #endif

@@ -245,13 +245,15 @@ extension SingletonPlayerWebView {
                         video.play();
                     }
 
-                    const durationMs = Math.max(300, \(fadeDurationMs));
+                    const durationMs = Math.max(200, \(fadeDurationMs));
                     const startTime = performance.now();
 
                     window.__kasetFadeInterval = setInterval(() => {
                         const elapsed = performance.now() - startTime;
                         const progress = Math.min(1.0, elapsed / durationMs);
-                        video.volume = Math.min(1.0, progress);
+                        // Equal-Power Sine curve: smooth musical bloom from 0 to 1
+                        const factor = Math.sin(progress * 0.5 * Math.PI);
+                        video.volume = Math.min(1.0, factor);
 
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);
@@ -338,13 +340,15 @@ extension SingletonPlayerWebView {
                     }
 
                     const startVol = video.volume;
-                    const durationMs = Math.max(300, \(fadeDurationMs));
+                    const durationMs = Math.max(200, \(fadeDurationMs));
                     const startTime = performance.now();
 
                     window.__kasetFadeInterval = setInterval(() => {
                         const elapsed = performance.now() - startTime;
                         const progress = Math.min(1.0, elapsed / durationMs);
-                        video.volume = Math.max(0.0, startVol * (1.0 - progress));
+                        // Equal-Power Cosine curve: natural acoustic decay from startVol to 0
+                        const factor = Math.cos(progress * 0.5 * Math.PI);
+                        video.volume = Math.max(0.0, startVol * factor);
 
                         if (progress >= 1.0) {
                             clearInterval(window.__kasetFadeInterval);

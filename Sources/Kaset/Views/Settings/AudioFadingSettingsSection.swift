@@ -31,12 +31,12 @@ struct AudioFadingSettingsSection: View {
 
                         Slider(
                             value: self.$settings.audioFadeDuration,
-                            in: 0.5 ... 3.0,
+                            in: 0.3 ... 3.0,
                             step: 0.1
                         ) {
                             Text("Fade Duration")
                         } minimumValueLabel: {
-                            Text("0.5s").font(.caption).foregroundStyle(.secondary)
+                            Text("0.3s").font(.caption).foregroundStyle(.secondary)
                         } maximumValueLabel: {
                             Text("3.0s").font(.caption).foregroundStyle(.secondary)
                         }
