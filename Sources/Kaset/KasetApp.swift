@@ -250,6 +250,7 @@ struct KasetApp: App {
                 .environment(\.showCommandBar, self.$showCommandBar)
                 .environment(\.showWhatsNew, self.$showWhatsNew)
                 .environment(\.usesLegacyMacOS15UI, self.settings.useLegacyMacOS15UI)
+                .windowToolbarFullScreenVisibility(.hidden)
                 .onAppear {
                     DiagnosticsLogger.app.info("KasetApp: App content appeared")
                     self.textInputFocusState.startMonitoring()
@@ -339,7 +340,6 @@ struct KasetApp: App {
         .defaultSize(width: MainWindowLayout.defaultWidth, height: MainWindowLayout.defaultHeight)
         .windowResizability(.contentMinSize)
         .windowStyle(.hiddenTitleBar)
-        .windowToolbarFullScreenVisibility(.hidden)
         .handlesExternalEvents(matching: ["*"])
 
         Settings {
