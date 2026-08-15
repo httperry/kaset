@@ -438,27 +438,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 }
             } detail: {
-                ZStack(alignment: .top) {
-                    Group {
-                        if self.settings.appSource == .music {
-                            self.detailView(
-                                for: self.navigationSelection,
-                                pinnedItem: self.selectedSidebarPinnedItem,
-                                client: self.client
-                            )
-                        } else {
-                            YouTubeContentView(
-                                selection: self.youtubeNavigationSelection,
-                                store: self.youtubeStore
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        Color.clear.frame(height: 50)
-                    }
-
-                    self.topBarView
+                if self.settings.appSource == .music {
+                    self.detailView(
+                        for: self.navigationSelection,
+                        pinnedItem: self.selectedSidebarPinnedItem,
+                        client: self.client
+                    )
+                } else {
+                    YouTubeContentView(
+                        selection: self.youtubeNavigationSelection,
+                        store: self.youtubeStore
+                    )
                 }
             }
             .id(self.contentResetID)
@@ -469,13 +459,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     self.columnVisibility = .all
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
-                self.isFullScreen = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
-                self.isFullScreen = false
-                self.isHoveringFullscreenTopBar = false
-            }
 
             // Right sidebar overlay - either lyrics or queue (mutually exclusive)
             self.rightSidebarOverlay(client: self.client)
@@ -484,13 +467,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar(removing: .sidebarToggle)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-    }
-
-    @ViewBuilder
-    private var topBarView: some View {
-        if !self.isFullScreen || self.isHoveringFullscreenTopBar {
-            HStack(spacing: 12) {
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                         if self.columnVisibility == .all {
@@ -509,14 +487,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .buttonStyle(.plain)
                 .help(String(localized: "Toggle Sidebar"))
                 .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+            }
 
-                Text(self.currentNavigationTitle)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-
-                Spacer()
-
-                if self.supportsCommandBarUI {
+            if self.supportsCommandBarUI {
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         self.presentCommandBarIfAvailable()
                     } label: {
@@ -532,58 +506,20 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, self.isFullScreen ? 8 : 10)
-            .frame(height: 50)
-            .background {
-                ZStack {
-                    // Liquid Glass refraction layer with smooth feathered alpha mask
-                    Color.clear
-                        .compatGlass(interactive: false, tint: Color.black.opacity(0.4), in: Rectangle())
-                        .mask(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .white, location: 0.0),
-                                    .init(color: .white.opacity(0.85), location: 0.40),
-                                    .init(color: .white.opacity(0.40), location: 0.70),
-                                    .init(color: .white.opacity(0.08), location: 0.88),
-                                    .init(color: .clear, location: 1.0),
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    // Dark gradient overlay that softly dissolves without any hard line
-                    LinearGradient(
-                        stops: [
-                            .init(color: Color.black.opacity(0.80), location: 0.0),
-                            .init(color: Color.black.opacity(0.55), location: 0.40),
-                            .init(color: Color.black.opacity(0.20), location: 0.70),
-                            .init(color: Color.black.opacity(0.03), location: 0.88),
-                            .init(color: .clear, location: 1.0),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-                .frame(height: 64)
-                .ignoresSafeArea(edges: .top)
-            }
-            .transition(.move(edge: .top).combined(with: .opacity))
         }
-
-        if self.isFullScreen {
-            // Hover trigger zone along top edge in fullscreen mode
-            Color.clear
-                .frame(height: self.isHoveringFullscreenTopBar ? 12 : 28)
-                .frame(maxWidth: .infinity, alignment: .top)
-                .onHover { hovering in
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        self.isHoveringFullscreenTopBar = hovering
-                    }
-                }
-        }
+        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        .toolbarBackground(
+            LinearGradient(
+                stops: [
+                    .init(color: Color.black.opacity(0.85), location: 0.0),
+                    .init(color: Color.black.opacity(0.45), location: 0.65),
+                    .init(color: Color.clear, location: 1.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            ),
+            for: .windowToolbar
+        )
     }
 
     private var currentNavigationTitle: String {
