@@ -178,6 +178,7 @@ enum AccessibilityID {
         static let container = "mainWindow"
         static let initializingView = "mainWindow.initializing"
         static let aiButton = "mainWindow.aiButton"
+        static let fullscreenButton = "mainWindow.fullscreenButton"
         static let commandBar = "mainWindow.commandBar"
         static let commandBarOverlay = "mainWindow.commandBarOverlay"
         static let commandBarInput = "mainWindow.commandBarInput"

@@ -454,9 +454,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        Color.clear.frame(height: 38)
-                    }
 
                     self.topBarView
                 }
@@ -468,6 +465,12 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 if self.columnVisibility != .all {
                     self.columnVisibility = .all
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
+                self.isFullScreen = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
+                self.isFullScreen = false
             }
 
             // Right sidebar overlay - either lyrics or queue (mutually exclusive)
@@ -521,6 +524,21 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .help(String(localized: "Open Command Bar (⌘K)"))
                 .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
             }
+
+            Button {
+                if let window = NSApp.keyWindow ?? NSApp.windows.first(where: { MainWindowLayout.isPrimaryWindow($0) }) {
+                    window.toggleFullScreen(nil)
+                }
+            } label: {
+                Image(systemName: self.isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 28, height: 28)
+                    .compatGlass(interactive: true, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .help(self.isFullScreen ? String(localized: "Exit Full Screen") : String(localized: "Enter Full Screen"))
+            .accessibilityIdentifier(AccessibilityID.MainWindow.fullscreenButton)
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
