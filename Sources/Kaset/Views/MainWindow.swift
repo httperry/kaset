@@ -79,9 +79,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     /// Column visibility state for NavigationSplitView - persisted to fix restoration from dock.
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
-    /// Fullscreen presentation and autohiding topbar hover state.
+    /// Fullscreen presentation state.
     @State private var isFullScreen = false
-    @State private var isHoveringFullscreenTopBar = false
 
     init(
         navigationSelection: Binding<NavigationItem?>,
@@ -454,10 +453,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        Color.clear.frame(height: 32)
-                    }
-
+                    // Removed the 32pt safeAreaInset here so the app content shifts up.
+                    
                     self.topBarView
                 }
             }
@@ -467,6 +464,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 // Ensure the sidebar returns when the app is re-activated from the Dock or app switcher.
                 if self.columnVisibility != .all {
                     self.columnVisibility = .all
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
+                self.isFullScreen = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
+                self.isFullScreen = false
+            }
+            .onAppear {
+                if let window = NSApplication.shared.windows.first(where: { $0.title == MainWindowLayout.windowTitle }) {
+                    self.isFullScreen = window.styleMask.contains(.fullScreen)
                 }
             }
 
@@ -522,9 +530,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .frame(height: 36)
+        .padding(.leading, (!self.isFullScreen && self.columnVisibility == .detailOnly) ? 72 : 16)
+        .padding(.trailing, 16)
+        .padding(.top, self.isFullScreen ? 36 : 14) // Shift text and buttons up in windowed mode, but keep safe in fullscreen
+        .frame(height: self.isFullScreen ? 58 : 36)
         .background {
             ZStack {
                 // Liquid Glass refraction layer with smooth feathered alpha mask
@@ -557,9 +566,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     endPoint: .bottom
                 )
             }
-            .frame(height: 48)
+            .frame(height: self.isFullScreen ? 64 : 48)
             .ignoresSafeArea(edges: .top)
         }
+        .ignoresSafeArea(edges: .top)
     }
 
     private var currentNavigationTitle: String {
