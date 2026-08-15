@@ -80,10 +80,14 @@ struct Sidebar: View {
         .listStyle(.sidebar)
         .compatTranslucentSidebar()
         .accessibilityIdentifier(AccessibilityID.Sidebar.container)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Color.clear.frame(height: 38)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // Source toggle + profile section at bottom (shared with YouTubeSidebar)
             SidebarFooterView()
         }
+        .toolbar(removing: .sidebarToggle)
         .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 300)
     }
 
