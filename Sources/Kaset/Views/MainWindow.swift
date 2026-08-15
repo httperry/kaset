@@ -532,8 +532,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         }
         .padding(.leading, (!self.isFullScreen && self.columnVisibility == .detailOnly) ? 72 : 16)
         .padding(.trailing, 16)
-        .padding(.top, self.isFullScreen ? 36 : 14) // Shift text and buttons up in windowed mode, but keep safe in fullscreen
-        .frame(height: self.isFullScreen ? 58 : 36)
+        .padding(.top, 14) // Shift text and buttons up in windowed mode, but keep safe in fullscreen
+        .frame(height: 36)
         .background {
             ZStack {
                 // Liquid Glass refraction layer with smooth feathered alpha mask
@@ -566,7 +566,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     endPoint: .bottom
                 )
             }
-            .frame(height: self.isFullScreen ? 64 : 48)
+            .frame(height: 48)
             .ignoresSafeArea(edges: .top)
         }
         .ignoresSafeArea(edges: .top)
