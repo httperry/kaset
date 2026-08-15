@@ -42,6 +42,9 @@ struct YouTubeSidebar: View {
         .listStyle(.sidebar)
         .compatTranslucentSidebar()
         .accessibilityIdentifier(AccessibilityID.YouTubeSidebar.container)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            Color.clear.frame(height: 44)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFooterView()
         }

@@ -438,17 +438,27 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 }
             } detail: {
-                if self.settings.appSource == .music {
-                    self.detailView(
-                        for: self.navigationSelection,
-                        pinnedItem: self.selectedSidebarPinnedItem,
-                        client: self.client
-                    )
-                } else {
-                    YouTubeContentView(
-                        selection: self.youtubeNavigationSelection,
-                        store: self.youtubeStore
-                    )
+                ZStack(alignment: .top) {
+                    Group {
+                        if self.settings.appSource == .music {
+                            self.detailView(
+                                for: self.navigationSelection,
+                                pinnedItem: self.selectedSidebarPinnedItem,
+                                client: self.client
+                            )
+                        } else {
+                            YouTubeContentView(
+                                selection: self.youtubeNavigationSelection,
+                                store: self.youtubeStore
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Color.clear.frame(height: 52)
+                    }
+
+                    self.topBarView
                 }
             }
             .id(self.contentResetID)
@@ -467,59 +477,89 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar(removing: .sidebarToggle)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                        if self.columnVisibility == .all {
-                            self.columnVisibility = .detailOnly
-                        } else {
-                            self.columnVisibility = .all
-                        }
+    }
+
+    private var topBarView: some View {
+        HStack(spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    if self.columnVisibility == .all {
+                        self.columnVisibility = .detailOnly
+                    } else {
+                        self.columnVisibility = .all
                     }
-                } label: {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 28, height: 28)
-                        .compatGlass(interactive: true, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .help(String(localized: "Toggle Sidebar"))
-                .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+            } label: {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 28, height: 28)
+                    .compatGlass(interactive: true, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .help(String(localized: "Toggle Sidebar"))
+            .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+
+            Text(self.currentNavigationTitle)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+
+            Spacer()
 
             if self.supportsCommandBarUI {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        self.presentCommandBarIfAvailable()
-                    } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 28, height: 28)
-                            .compatGlass(interactive: true, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("k", modifiers: .command)
-                    .help(String(localized: "Open Command Bar (⌘K)"))
-                    .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
+                Button {
+                    self.presentCommandBarIfAvailable()
+                } label: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 28, height: 28)
+                        .compatGlass(interactive: true, in: Circle())
                 }
+                .buttonStyle(.plain)
+                .keyboardShortcut("k", modifiers: .command)
+                .help(String(localized: "Open Command Bar (⌘K)"))
+                .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
             }
         }
-        .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-        .toolbarBackground(
-            LinearGradient(
-                stops: [
-                    .init(color: Color.black.opacity(0.85), location: 0.0),
-                    .init(color: Color.black.opacity(0.45), location: 0.65),
-                    .init(color: Color.clear, location: 1.0),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            ),
-            for: .windowToolbar
-        )
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .frame(height: 52)
+        .background {
+            ZStack {
+                // Liquid Glass refraction layer with smooth feathered alpha mask
+                Color.clear
+                    .compatGlass(interactive: false, tint: Color.black.opacity(0.4), in: Rectangle())
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .white, location: 0.0),
+                                .init(color: .white.opacity(0.85), location: 0.40),
+                                .init(color: .white.opacity(0.40), location: 0.70),
+                                .init(color: .white.opacity(0.08), location: 0.88),
+                                .init(color: .clear, location: 1.0),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                // Dark gradient overlay that softly dissolves without any hard line
+                LinearGradient(
+                    stops: [
+                        .init(color: Color.black.opacity(0.80), location: 0.0),
+                        .init(color: Color.black.opacity(0.55), location: 0.40),
+                        .init(color: Color.black.opacity(0.20), location: 0.70),
+                        .init(color: Color.black.opacity(0.03), location: 0.88),
+                        .init(color: .clear, location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+            .frame(height: 64)
+            .ignoresSafeArea(edges: .top)
+        }
     }
 
     private var currentNavigationTitle: String {

@@ -45,6 +45,7 @@ enum MainWindowLayout {
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
+        window.toolbar = nil
 
         window.contentMinSize = self.minimumContentSize
         self.expandIfNeeded(window)
