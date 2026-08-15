@@ -455,7 +455,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .safeAreaInset(edge: .top, spacing: 0) {
-                        Color.clear.frame(height: 52)
+                        Color.clear.frame(height: 38)
                     }
 
                     self.topBarView
@@ -523,8 +523,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .frame(height: 52)
+        .padding(.top, 4)
+        .frame(height: 42)
         .background {
             ZStack {
                 // Liquid Glass refraction layer with smooth feathered alpha mask
@@ -557,7 +557,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     endPoint: .bottom
                 )
             }
-            .frame(height: 64)
+            .frame(height: 54)
             .ignoresSafeArea(edges: .top)
         }
     }

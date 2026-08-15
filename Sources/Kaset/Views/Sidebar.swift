@@ -81,7 +81,7 @@ struct Sidebar: View {
         .compatTranslucentSidebar()
         .accessibilityIdentifier(AccessibilityID.Sidebar.container)
         .safeAreaInset(edge: .top, spacing: 0) {
-            Color.clear.frame(height: 44)
+            Color.clear.frame(height: 34)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // Source toggle + profile section at bottom (shared with YouTubeSidebar)
