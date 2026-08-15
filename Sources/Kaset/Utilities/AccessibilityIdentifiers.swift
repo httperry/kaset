@@ -25,6 +25,7 @@ enum AccessibilityID {
         static let likedMusicItem = "sidebar.likedMusic"
         static let libraryItem = "sidebar.library"
         static let historyItem = "sidebar.history"
+        static let toggleButton = "sidebar.toggleButton"
     }
 
     // MARK: - PlayerBar
