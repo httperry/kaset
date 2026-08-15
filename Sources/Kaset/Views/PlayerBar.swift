@@ -117,17 +117,43 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
     }
 
     private var playerAreaFade: some View {
-        LinearGradient(
-            colors: [
-                Color(nsColor: .windowBackgroundColor).opacity(0),
-                Color(nsColor: .windowBackgroundColor).opacity(0.22),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 44)
+        ZStack {
+            // Liquid glass blur layer with smooth feathered alpha mask
+            Color.clear
+                .compatGlass(interactive: false, tint: Color.black.opacity(0.4), in: Rectangle())
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0.0),
+                            .init(color: .white.opacity(0.85), location: 0.25),
+                            .init(color: .white.opacity(0.50), location: 0.50),
+                            .init(color: .white.opacity(0.18), location: 0.70),
+                            .init(color: .white.opacity(0.03), location: 0.85),
+                            .init(color: .clear, location: 1.0),
+                        ],
+                        startPoint: .bottom,
+                        endPoint: .top
+                    )
+                )
+
+            // Deep dark ambient gradient that dissolves seamlessly into the background
+            LinearGradient(
+                stops: [
+                    .init(color: Color.black.opacity(0.85), location: 0.0),
+                    .init(color: Color.black.opacity(0.65), location: 0.25),
+                    .init(color: Color.black.opacity(0.35), location: 0.50),
+                    .init(color: Color.black.opacity(0.12), location: 0.70),
+                    .init(color: Color.black.opacity(0.02), location: 0.85),
+                    .init(color: .clear, location: 1.0),
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+        }
+        .frame(height: 150)
         .frame(maxWidth: .infinity)
         .padding(.bottom, -8)
+        .ignoresSafeArea(edges: .bottom)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
