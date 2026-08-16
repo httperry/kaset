@@ -456,7 +456,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    // Removed the 32pt safeAreaInset here so the app content shifts up.
+                    .safeAreaPadding(.top, 52)
 
                     self.topBarView
                 }
@@ -502,6 +502,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar(removing: .sidebarToggle)
+        .background {
+            SplitViewTitlebarConfigurator()
+        }
     }
 
     private var topBarView: some View {

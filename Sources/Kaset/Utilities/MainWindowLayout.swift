@@ -57,6 +57,7 @@ enum MainWindowLayout {
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
         window.toolbar = nil
+        self.configureSplitView(in: window)
     }
 
     /// Re-applies windowed-mode titlebar settings after exiting fullscreen.
@@ -69,6 +70,37 @@ enum MainWindowLayout {
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
         window.toolbar = nil
+        self.configureSplitView(in: window)
+    }
+
+    /// Configures the NSSplitViewController's split view items so the sidebar does
+    /// not create an auxiliary sidebar drawer in the fullscreen titlebar or add a
+    /// vertical divider line through the unified titlebar.
+    @MainActor
+    static func configureSplitView(in window: NSWindow) {
+        func findSplitView(in view: NSView) -> NSSplitView? {
+            if let sv = view as? NSSplitView {
+                return sv
+            }
+            for subview in view.subviews {
+                if let found = findSplitView(in: subview) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        guard let contentView = window.contentView,
+              let splitView = findSplitView(in: contentView),
+              let splitVC = splitView.delegate as? NSSplitViewController
+        else { return }
+
+        for item in splitVC.splitViewItems {
+            if item.titlebarSeparatorStyle != .none {
+                item.titlebarSeparatorStyle = .none
+            }
+            item.allowsFullHeightLayout = true
+        }
     }
 
     /// Pure clamp used by both AppKit configuration and tests.
@@ -100,6 +132,39 @@ enum MainWindowLayout {
 
         let constrainedFrame = window.constrainFrameRect(clampedFrame, to: window.screen)
         window.setFrame(constrainedFrame, display: true)
+    }
+}
+
+// MARK: - SplitViewTitlebarConfigurator
+
+/// Invisible SwiftUI bridge that removes the sidebar titlebar drawer and divider line
+/// from the parent NSSplitViewController.
+struct SplitViewTitlebarConfigurator: NSViewRepresentable {
+    func makeNSView(context _: Context) -> SplitViewConfiguratorNSView {
+        SplitViewConfiguratorNSView()
+    }
+
+    func updateNSView(_ nsView: SplitViewConfiguratorNSView, context _: Context) {
+        nsView.configureSplitView()
+    }
+}
+
+// MARK: - SplitViewConfiguratorNSView
+
+final class SplitViewConfiguratorNSView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        self.configureSplitView()
+    }
+
+    override func layout() {
+        super.layout()
+        self.configureSplitView()
+    }
+
+    func configureSplitView() {
+        guard let window = self.window else { return }
+        MainWindowLayout.configureSplitView(in: window)
     }
 }
 
