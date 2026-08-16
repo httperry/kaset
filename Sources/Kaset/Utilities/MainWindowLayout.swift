@@ -99,7 +99,6 @@ enum MainWindowLayout {
             if item.titlebarSeparatorStyle != .none {
                 item.titlebarSeparatorStyle = .none
             }
-            item.allowsFullHeightLayout = true
         }
     }
 

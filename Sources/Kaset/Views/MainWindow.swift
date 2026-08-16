@@ -456,9 +456,11 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .safeAreaPadding(.top, 52)
+                    .safeAreaPadding(.top, self.isFullScreen ? 0 : 52)
 
-                    self.topBarView
+                    if !self.isFullScreen {
+                        self.topBarView
+                    }
                 }
             }
             .id(self.contentResetID)
