@@ -456,29 +456,35 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .safeAreaPadding(.top, self.isFullScreen ? 0 : 52)
-
-                    if !self.isFullScreen {
-                        self.topBarView
+                    // Reserve space so scroll content starts below the floating topbar overlay.
+                    // In fullscreen the bar is taller (72 pt with the macOS titlebar clearance padding).
+                    .safeAreaInset(edge: .top) {
+                        Color.clear.frame(height: self.isFullScreen ? 72 : 44)
                     }
+
+                    self.topBarView
                 }
             }
             .id(self.contentResetID)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-                // Ensure the sidebar returns when the app is re-activated from the Dock or app switcher.
-                if self.columnVisibility != .all {
+                // Restore sidebar when re-activated from Dock/app-switcher — but not while in fullscreen
+                // where the sidebar should remain collapsed.
+                if !self.isFullScreen, self.columnVisibility != .all {
                     self.columnVisibility = .all
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
                 withAnimation(.easeInOut(duration: 0.25)) {
                     self.isFullScreen = true
+                    // Collapse sidebar so it does not render behind the macOS autohiding titlebar.
+                    self.columnVisibility = .detailOnly
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
                 withAnimation(.easeInOut(duration: 0.25)) {
                     self.isFullScreen = true
+                    self.columnVisibility = .detailOnly
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
@@ -489,6 +495,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
                 withAnimation(.easeInOut(duration: 0.25)) {
                     self.isFullScreen = false
+                    // Restore sidebar when returning to windowed mode.
+                    self.columnVisibility = .all
                 }
             }
             .onAppear {
@@ -504,9 +512,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar(removing: .sidebarToggle)
-        .background {
-            SplitViewTitlebarConfigurator()
-        }
     }
 
     private var topBarView: some View {
@@ -564,15 +569,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
             }
         }
+        // In fullscreen, pad the controls below the macOS auto-hiding menu-bar zone (~28 pt).
+        .padding(.top, self.isFullScreen ? 28 : 0)
         .padding(.leading, (!self.isFullScreen && self.columnVisibility == .detailOnly) ? 76 : 16)
         .padding(.trailing, 16)
-        .frame(height: 44)
+        .frame(height: self.isFullScreen ? 72 : 44)
         .background(alignment: .top) {
             ZStack(alignment: .top) {
                 // Window drag handle in empty regions for native window movement & double-click zoom
                 WindowDragHandle()
                     .allowsHitTesting(!self.isFullScreen)
-                    .frame(height: 44)
+                    .frame(height: self.isFullScreen ? 72 : 44)
 
                 let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
@@ -607,7 +614,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     endPoint: .bottom
                 )
             }
-            .frame(height: 64)
+            .frame(height: self.isFullScreen ? 84 : 64)
             .ignoresSafeArea(edges: .top)
         }
         .animation(.easeInOut(duration: 0.25), value: self.isFullScreen)
