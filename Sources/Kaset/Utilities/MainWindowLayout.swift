@@ -51,24 +51,34 @@ enum MainWindowLayout {
         // In fullscreen, macOS manages its own auto-hiding titlebar.
         guard !window.styleMask.contains(.fullScreen) else { return }
 
+        if window.toolbar == nil {
+            let toolbar = NSToolbar(identifier: "KasetMainWindowToolbar")
+            toolbar.showsBaselineSeparator = false
+            window.toolbar = toolbar
+        }
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
-        window.toolbar = nil
+        window.toolbarStyle = .unifiedCompact
     }
 
     /// Re-applies windowed-mode titlebar settings after exiting fullscreen.
     /// macOS may reset window properties during the fullscreen transition.
     @MainActor
     static func restoreWindowedAppearance(_ window: NSWindow) {
+        if window.toolbar == nil {
+            let toolbar = NSToolbar(identifier: "KasetMainWindowToolbar")
+            toolbar.showsBaselineSeparator = false
+            window.toolbar = toolbar
+        }
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
-        window.toolbar = nil
+        window.toolbarStyle = .unifiedCompact
     }
 
     /// Pure clamp used by both AppKit configuration and tests.
