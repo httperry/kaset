@@ -28,6 +28,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     @Environment(\.showCommandBar) private var showCommandBar
     @Environment(\.showWhatsNew) private var showWhatsNew
     @Environment(\.usesLegacyMacOS15UI) private var usesLegacyMacOS15UI
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Binding to navigation selection for keyboard shortcut control from parent.
     @Binding var navigationSelection: NavigationItem?
@@ -428,6 +429,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                             self.pinnedNavigationPaths[item.contentId] = NavigationPath()
                         }
                     )
+                    .safeAreaPadding(.top, 12)
                 } else {
                     YouTubeSidebar(
                         selection: self.$youtubeNavigationSelection,
@@ -435,6 +437,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                             self.youtubeStore.navigationPath = NavigationPath()
                         }
                     )
+                    .safeAreaPadding(.top, 12)
                 }
             } detail: {
                 ZStack(alignment: .top) {
@@ -454,7 +457,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     // Removed the 32pt safeAreaInset here so the app content shifts up.
-                    
+
                     self.topBarView
                 }
             }
@@ -466,14 +469,28 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     self.columnVisibility = .all
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.isFullScreen = true
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
-                self.isFullScreen = true
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.isFullScreen = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.isFullScreen = false
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
-                self.isFullScreen = false
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    self.isFullScreen = false
+                }
             }
             .onAppear {
-                if let window = NSApplication.shared.windows.first(where: { $0.title == MainWindowLayout.windowTitle }) {
+                if let window = NSApplication.shared.windows.first(where: { MainWindowLayout.isPrimaryWindow($0) }) {
                     self.isFullScreen = window.styleMask.contains(.fullScreen)
                 }
             }
@@ -489,28 +506,40 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
     private var topBarView: some View {
         HStack(spacing: 12) {
-            Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    if self.columnVisibility == .all {
-                        self.columnVisibility = .detailOnly
-                    } else {
-                        self.columnVisibility = .all
+            HStack(spacing: 8) {
+                // Sidebar Toggle
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        if self.columnVisibility == .all {
+                            self.columnVisibility = .detailOnly
+                        } else {
+                            self.columnVisibility = .all
+                        }
                     }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 28, height: 28)
-                    .compatGlass(interactive: true, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .help(String(localized: "Toggle Sidebar"))
-            .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+                .buttonStyle(.plain)
+                .compatGlass(interactive: true, in: .capsule)
+                .help(String(localized: "Toggle Sidebar"))
+                .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
 
-            Text(self.currentNavigationTitle)
-                .font(.system(size: 13, weight: .semibold))
+                // Location Pill
+                HStack(spacing: 6) {
+                    Image(systemName: self.currentNavigationIcon)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(self.currentNavigationTitle)
+                        .font(.system(size: 14, weight: .semibold))
+                }
                 .foregroundStyle(.primary)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .compatGlass(interactive: false, in: .capsule)
+            }
 
             Spacer()
 
@@ -521,8 +550,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     Image(systemName: "sparkles")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
-                        .frame(width: 28, height: 28)
-                        .compatGlass(interactive: true, in: Circle())
+                        .frame(width: 32, height: 32)
+                        .compatGlass(interactive: true, in: .circle)
                 }
                 .buttonStyle(.plain)
                 .keyboardShortcut("k", modifiers: .command)
@@ -530,22 +559,29 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
             }
         }
-        .padding(.leading, (!self.isFullScreen && self.columnVisibility == .detailOnly) ? 72 : 16)
+        .padding(.leading, (!self.isFullScreen && self.columnVisibility == .detailOnly) ? 76 : 16)
         .padding(.trailing, 16)
-        .padding(.top, 14) // Shift text and buttons up in windowed mode, but keep safe in fullscreen
-        .frame(height: 36)
-        .background {
-            ZStack {
-                // Liquid Glass refraction layer with smooth feathered alpha mask
+        .frame(height: 44)
+        .background(alignment: .top) {
+            ZStack(alignment: .top) {
+                // Window drag handle in empty regions for native window movement & double-click zoom
+                WindowDragHandle()
+                    .allowsHitTesting(!self.isFullScreen)
+                    .frame(height: 44)
+
+                let tintColor = self.colorScheme == .dark ? Color.black : Color.white
+
+                // Liquid Glass layer with feathered alpha mask
                 Color.clear
-                    .compatGlass(interactive: false, tint: Color.black.opacity(0.4), in: Rectangle())
+                    .compatGlass(interactive: false, in: Rectangle())
                     .mask(
                         LinearGradient(
                             stops: [
-                                .init(color: .white, location: 0.0),
-                                .init(color: .white.opacity(0.85), location: 0.40),
-                                .init(color: .white.opacity(0.40), location: 0.70),
-                                .init(color: .white.opacity(0.08), location: 0.88),
+                                .init(color: .white.opacity(0.95), location: 0.0),
+                                .init(color: .white.opacity(0.85), location: 0.25),
+                                .init(color: .white.opacity(0.55), location: 0.50),
+                                .init(color: .white.opacity(0.20), location: 0.75),
+                                .init(color: .white.opacity(0.04), location: 0.90),
                                 .init(color: .clear, location: 1.0),
                             ],
                             startPoint: .top,
@@ -553,22 +589,23 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         )
                     )
 
-                // Dark gradient overlay that softly dissolves without any hard line
+                // Ambient gradient overlay for clean contrast
                 LinearGradient(
                     stops: [
-                        .init(color: Color.black.opacity(0.80), location: 0.0),
-                        .init(color: Color.black.opacity(0.55), location: 0.40),
-                        .init(color: Color.black.opacity(0.20), location: 0.70),
-                        .init(color: Color.black.opacity(0.03), location: 0.88),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.24 : 0.16), location: 0.0),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.10), location: 0.30),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.08 : 0.04), location: 0.60),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.008), location: 0.85),
                         .init(color: .clear, location: 1.0),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
-            .frame(height: 48)
+            .frame(height: 64)
             .ignoresSafeArea(edges: .top)
         }
+        .animation(.easeInOut(duration: 0.25), value: self.isFullScreen)
         .ignoresSafeArea(edges: .top)
     }
 
@@ -580,6 +617,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             return self.navigationSelection?.displayName ?? String(localized: "Home")
         } else {
             return self.youtubeNavigationSelection?.displayName ?? String(localized: "Home")
+        }
+    }
+
+    private var currentNavigationIcon: String {
+        if self.settings.appSource == .music {
+            if let selectedSidebarPinnedItem {
+                return selectedSidebarPinnedItem.systemImage
+            }
+            return self.navigationSelection?.icon ?? "house"
+        } else {
+            return self.youtubeNavigationSelection?.icon ?? "house"
         }
     }
 
