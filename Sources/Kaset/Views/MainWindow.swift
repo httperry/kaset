@@ -402,10 +402,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 }
             }
         }
-        // In fullscreen, slide the native toolbar strip (with traffic lights) in on hover.
-        // This gives the green zoom/exit button a proper hit-test target — without it,
-        // .hiddenTitleBar leaves the traffic lights unclickable in fullscreen.
-        .windowToolbarFullScreenVisibility(.onHover)
     }
 
     // MARK: - Main Content

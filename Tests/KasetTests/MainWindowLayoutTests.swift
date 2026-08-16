@@ -37,7 +37,7 @@ struct MainWindowLayoutTests {
         #expect(!MainWindowLayout.isPrimaryWindowIdentity(title: "Settings", frameAutosaveName: ""))
     }
 
-    @Test("Configure primary window sets window properties and non-nil toolbar")
+    @Test("Configure primary window sets window properties with nil toolbar")
     @MainActor
     func configurePrimaryWindow() {
         let window = NSWindow(
@@ -50,17 +50,15 @@ struct MainWindowLayoutTests {
 
         MainWindowLayout.configure(window)
 
-        #expect(window.toolbar != nil)
-        #expect(window.toolbar?.showsBaselineSeparator == false)
+        #expect(window.toolbar == nil)
         #expect(window.titleVisibility == .hidden)
         #expect(window.titlebarAppearsTransparent == true)
         #expect(window.titlebarSeparatorStyle == .none)
         #expect(window.styleMask.contains(.fullSizeContentView))
         #expect(window.isMovableByWindowBackground == false)
-        #expect(window.toolbarStyle == .unifiedCompact)
     }
 
-    @Test("Restore windowed appearance sets window properties and non-nil toolbar")
+    @Test("Restore windowed appearance sets window properties with nil toolbar")
     @MainActor
     func restoreWindowedAppearance() {
         let window = NSWindow(
@@ -73,13 +71,11 @@ struct MainWindowLayoutTests {
 
         MainWindowLayout.restoreWindowedAppearance(window)
 
-        #expect(window.toolbar != nil)
-        #expect(window.toolbar?.showsBaselineSeparator == false)
+        #expect(window.toolbar == nil)
         #expect(window.titleVisibility == .hidden)
         #expect(window.titlebarAppearsTransparent == true)
         #expect(window.titlebarSeparatorStyle == .none)
         #expect(window.styleMask.contains(.fullSizeContentView))
         #expect(window.isMovableByWindowBackground == false)
-        #expect(window.toolbarStyle == .unifiedCompact)
     }
 }

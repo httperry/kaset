@@ -338,7 +338,6 @@ struct KasetApp: App {
         }
         .defaultSize(width: MainWindowLayout.defaultWidth, height: MainWindowLayout.defaultHeight)
         .windowResizability(.contentMinSize)
-        .windowStyle(.hiddenTitleBar)
         .handlesExternalEvents(matching: ["*"])
 
         Settings {

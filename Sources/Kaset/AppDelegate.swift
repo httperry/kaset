@@ -379,12 +379,10 @@ extension AppDelegate: NSWindowDelegate {
         guard let window = notification.object as? NSWindow,
               MainWindowLayout.isPrimaryWindow(window)
         else { return }
-        // Keep titlebar invisible so our SwiftUI topbar owns the look.
-        // Do NOT nil the toolbar — macOS needs it to anchor the autohiding
-        // traffic-light strip (.windowToolbarFullScreenVisibility(.onHover)).
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
+        window.toolbar = nil
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {
