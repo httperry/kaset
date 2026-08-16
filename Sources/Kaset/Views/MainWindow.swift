@@ -402,6 +402,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 }
             }
         }
+        // In fullscreen, slide the native toolbar strip (with traffic lights) in on hover.
+        // This gives the green zoom/exit button a proper hit-test target — without it,
+        // .hiddenTitleBar leaves the traffic lights unclickable in fullscreen.
+        .windowToolbarFullScreenVisibility(.onHover)
     }
 
     // MARK: - Main Content
@@ -457,9 +461,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     // Reserve space so scroll content starts below the floating topbar overlay.
-                    // In fullscreen the bar is taller (72 pt with the macOS titlebar clearance padding).
+                    // 52 pt covers the 32 pt control row + gradient feather, in both windowed and fullscreen.
                     .safeAreaInset(edge: .top) {
-                        Color.clear.frame(height: self.isFullScreen ? 72 : 44)
+                        Color.clear.frame(height: 52)
                     }
 
                     self.topBarView
