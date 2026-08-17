@@ -585,15 +585,18 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
-            // Liquid Glass layer with feathered alpha mask
-            Color.clear
-                .compatGlass(interactive: false, in: Rectangle())
+            // Frosted glass material layer with ultra-smooth cubic fade (no harsh cutoff)
+            Rectangle()
+                .fill(.thinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .white.opacity(0.90), location: 0.0),
-                            .init(color: .white.opacity(0.65), location: 0.50),
-                            .init(color: .white.opacity(0.20), location: 0.80),
+                            .init(color: .white, location: 0.0),
+                            .init(color: .white.opacity(0.95), location: 0.25),
+                            .init(color: .white.opacity(0.70), location: 0.45),
+                            .init(color: .white.opacity(0.38), location: 0.65),
+                            .init(color: .white.opacity(0.12), location: 0.82),
+                            .init(color: .white.opacity(0.02), location: 0.94),
                             .init(color: .clear, location: 1.0),
                         ],
                         startPoint: .top,
@@ -601,12 +604,12 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 )
 
-            // Subtle prismatic chromatic sheen along the top glass
+            // Soft chromatic dispersion along the frosted surface
             LinearGradient(
                 stops: [
-                    .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.09 : 0.055), location: 0.0),
-                    .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.08 : 0.045), location: 0.35),
-                    .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.70),
+                    .init(color: Color(red: 0.42, green: 0.68, blue: 0.98).opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.0),
+                    .init(color: Color(red: 0.68, green: 0.45, blue: 0.95).opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.35),
+                    .init(color: Color(red: 0.95, green: 0.38, blue: 0.65).opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.70),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .topLeading,
@@ -615,27 +618,28 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             .mask(
                 LinearGradient(
                     stops: [
-                        .init(color: .white.opacity(0.90), location: 0.0),
-                        .init(color: .white.opacity(0.40), location: 0.60),
-                        .init(color: .clear, location: 1.0),
+                        .init(color: .white.opacity(0.80), location: 0.0),
+                        .init(color: .white.opacity(0.30), location: 0.50),
+                        .init(color: .clear, location: 0.85),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
 
-            // Ambient tone overlay for clean contrast
+            // Smooth ambient gradient for natural depth
             LinearGradient(
                 stops: [
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.14 : 0.07), location: 0.0),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.05 : 0.02), location: 0.55),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.18 : 0.10), location: 0.0),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.08 : 0.04), location: 0.40),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.01 : 0.005), location: 0.75),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
         }
-        .frame(height: 56)
+        .frame(height: 72)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
