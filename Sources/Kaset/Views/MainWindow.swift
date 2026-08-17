@@ -584,43 +584,49 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .frame(height: 44)
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-            let enableTint = true // 💡 TOGGLE THIS TO FALSE TO TEST WITHOUT TINT
+            let tintOpacity = self.colorScheme == .dark ? 0.35 : 0.15
+            let brandOpacity = self.colorScheme == .dark ? 0.12 : 0.06
 
-            // Natural frosted blur layer (distortion-free, no "shifting")
-            // Extended downwards with an ultra-smooth fade to eliminate harsh lines/cutoffs
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.95), location: 0.2),
-                            .init(color: .white.opacity(0.70), location: 0.4),
-                            .init(color: .white.opacity(0.40), location: 0.6),
-                            .init(color: .white.opacity(0.15), location: 0.8),
-                            .init(color: .white.opacity(0.04), location: 0.9),
-                            .init(color: .clear, location: 1.0),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-            if enableTint {
-                // Smooth ambient tone overlay
+            ZStack {
+                // Base Liquid Glass layer
+                Color.clear
+                    .compatGlass(interactive: false, in: Rectangle())
+                
+                // Subtle vertical brand chroma tint (smooth, no banding)
                 LinearGradient(
                     stops: [
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.20 : 0.12), location: 0.0),
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.12 : 0.06), location: 0.3),
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.05 : 0.02), location: 0.6),
+                        .init(color: PackageResourceLookup.brandAccent.opacity(brandOpacity), location: 0.0),
+                        .init(color: .clear, location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                // Smooth ambient tone for clean text contrast
+                LinearGradient(
+                    stops: [
+                        .init(color: tintColor.opacity(tintOpacity), location: 0.0),
                         .init(color: .clear, location: 1.0),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
+            .mask(
+                // A single, buttery smooth mask for all visual layers to eliminate harsh refractive edges
+                LinearGradient(
+                    stops: [
+                        .init(color: .white, location: 0.0),
+                        .init(color: .white.opacity(0.85), location: 0.40),
+                        .init(color: .white.opacity(0.30), location: 0.70),
+                        .init(color: .clear, location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
-        .frame(height: 110)
+        .frame(height: 64)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
