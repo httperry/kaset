@@ -534,6 +534,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     }
                     .buttonStyle(.plain)
                     .compatGlass(interactive: true, in: .capsule)
+                    .padding(.top, 4)
                     .help(String(localized: "Toggle Sidebar"))
                     .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
                 }
@@ -552,6 +553,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .compatGlass(interactive: false, in: .capsule)
+                    .padding(.top, 4)
                 }
             }
 
@@ -567,6 +569,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                             .compatGlass(interactive: true, in: .circle)
                     }
                     .buttonStyle(.plain)
+                    .padding(.top, 4)
                     .keyboardShortcut("k", modifiers: .command)
                     .help(String(localized: "Open Command Bar (⌘K)"))
                     .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
@@ -646,9 +649,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 }
             }
         }
+        .padding(.top, 6)
         .padding(.leading, self.isFullScreen ? 16 : (self.columnVisibility == .detailOnly ? 76 : 16))
         .padding(.trailing, 16)
-        .frame(height: 44)
+        .frame(height: 48)
         .ignoresSafeArea(edges: .top)
     }
 
