@@ -578,38 +578,69 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
     private var topBarBackground: some View {
         ZStack(alignment: .top) {
-            // Window drag handle
+            // Window drag handle in empty regions for native window movement & double-click zoom
             WindowDragHandle()
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
-            // True Variable Gaussian Blur — smoothly decreases Gaussian blur radius from 24px to 0px
-            // 100% full pixel opacity, zero milkiness/fading, zero geometric distortion.
-            VariableBlurView(maxBlurRadius: 24)
+            let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
-            // Delicate chromatic sheen
-            LinearGradient(
-                stops: [
-                    .init(color: Color.cyan.opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.0),
-                    .init(color: Color.purple.opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.50),
-                    .init(color: Color.pink.opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 1.0),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .mask(
+            // Liquid Glass layer with ultra-smooth cubic feathered alpha mask (no sharp cutoff shelf)
+            Color.clear
+                .compatGlass(interactive: false, in: Rectangle())
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0.0),
+                            .init(color: .white.opacity(0.88), location: 0.25),
+                            .init(color: .white.opacity(0.60), location: 0.50),
+                            .init(color: .white.opacity(0.28), location: 0.72),
+                            .init(color: .white.opacity(0.06), location: 0.88),
+                            .init(color: .clear, location: 1.0),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            if self.settings.topbarAmbientTintEnabled {
+                // Subtle prismatic chromatic sheen along the top glass
                 LinearGradient(
                     stops: [
-                        .init(color: .white.opacity(0.8), location: 0.0),
-                        .init(color: .white.opacity(0.3), location: 0.6),
+                        .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.08 : 0.045), location: 0.0),
+                        .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.07 : 0.035), location: 0.35),
+                        .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.70),
+                        .init(color: .clear, location: 1.0),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.85), location: 0.0),
+                            .init(color: .white.opacity(0.40), location: 0.50),
+                            .init(color: .clear, location: 0.85),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+                // Smooth ambient tone overlay with seamless fade-out
+                LinearGradient(
+                    stops: [
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.12 : 0.06), location: 0.0),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.40),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.01 : 0.005), location: 0.75),
                         .init(color: .clear, location: 1.0),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-            )
+            }
         }
-        .frame(height: 52)
+        .frame(height: 78)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
