@@ -175,7 +175,8 @@ struct HistoryView: View {
                     }
                 }
             }
-            .padding(.vertical, 20)
+            .padding(.top, 4)
+            .padding(.bottom, 20)
         }
         .accessibilityIdentifier(AccessibilityID.History.scrollView)
     }

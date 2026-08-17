@@ -86,7 +86,8 @@ struct NewReleasesView: View {
             }
             // Edge-to-edge so shelves slide under the glass sidebar; resting
             // inset is restored per-shelf via contentInset.
-            .padding(.vertical, 20)
+            .padding(.top, 4)
+            .padding(.bottom, 20)
         }
     }
 

@@ -536,8 +536,12 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     .compatGlass(interactive: true, in: .capsule)
                     .help(String(localized: "Toggle Sidebar"))
                     .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+                }
+            }
 
-                    // Location Pill
+            ToolbarItem(placement: .principal) {
+                if !self.isFullScreen {
+                    // Centered Location Pill — replaces default navigation title text in titlebar
                     HStack(spacing: 6) {
                         Image(systemName: self.currentNavigationIcon)
                             .font(.system(size: 13, weight: .semibold))
@@ -618,8 +622,21 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     }
 
     private var topBarView: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 8) {
+        ZStack {
+            // Centered Location Pill
+            HStack(spacing: 6) {
+                Image(systemName: self.currentNavigationIcon)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(self.currentNavigationTitle)
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .compatGlass(interactive: false, in: .capsule)
+
+            // Leading and Trailing controls
+            HStack {
                 // Sidebar Toggle
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -641,35 +658,23 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .help(String(localized: "Toggle Sidebar"))
                 .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
 
-                // Location Pill
-                HStack(spacing: 6) {
-                    Image(systemName: self.currentNavigationIcon)
-                        .font(.system(size: 13, weight: .semibold))
-                    Text(self.currentNavigationTitle)
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .compatGlass(interactive: false, in: .capsule)
-            }
+                Spacer()
 
-            Spacer()
-
-            if self.supportsCommandBarUI {
-                Button {
-                    self.presentCommandBarIfAvailable()
-                } label: {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 32, height: 32)
-                        .compatGlass(interactive: true, in: .circle)
+                if self.supportsCommandBarUI {
+                    Button {
+                        self.presentCommandBarIfAvailable()
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .compatGlass(interactive: true, in: .circle)
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("k", modifiers: .command)
+                    .help(String(localized: "Open Command Bar (⌘K)"))
+                    .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut("k", modifiers: .command)
-                .help(String(localized: "Open Command Bar (⌘K)"))
-                .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
             }
         }
         .padding(.leading, self.isFullScreen ? 16 : (self.columnVisibility == .detailOnly ? 76 : 16))
