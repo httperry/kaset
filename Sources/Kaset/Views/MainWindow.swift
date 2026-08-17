@@ -591,7 +591,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 Color.clear
                     .compatGlass(interactive: false, in: Rectangle())
                 
-                // Smooth ambient tone for clean text contrast (single perfect fade)
+                // Smooth ambient tone for clean text contrast
                 LinearGradient(
                     colors: [
                         tintColor.opacity(tintOpacity),
@@ -602,16 +602,28 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             }
             .mask(
-                // A single, perfect top-to-bottom alpha fade.
-                // NO intermediate stops to guarantee zero banding or hard transition lines.
+                // A pure smoothstep (ease-in-out) cubic curve to eliminate ANY visual banding or slope lines,
+                // fading to perfectly clear before the frame boundary to eliminate the sharp cutoff line.
                 LinearGradient(
-                    colors: [.white, .clear],
+                    stops: [
+                        .init(color: .white, location: 0.45),
+                        .init(color: .white.opacity(0.97), location: 0.50),
+                        .init(color: .white.opacity(0.90), location: 0.55),
+                        .init(color: .white.opacity(0.78), location: 0.61),
+                        .init(color: .white.opacity(0.65), location: 0.66),
+                        .init(color: .white.opacity(0.50), location: 0.72),
+                        .init(color: .white.opacity(0.35), location: 0.78),
+                        .init(color: .white.opacity(0.22), location: 0.83),
+                        .init(color: .white.opacity(0.10), location: 0.89),
+                        .init(color: .white.opacity(0.03), location: 0.94),
+                        .init(color: .clear, location: 1.0),
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
         }
-        .frame(height: 64)
+        .frame(height: 88)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
