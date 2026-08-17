@@ -585,24 +585,13 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
             let tintOpacity = self.colorScheme == .dark ? 0.35 : 0.15
-            let brandOpacity = self.colorScheme == .dark ? 0.12 : 0.06
 
             ZStack {
                 // Base Liquid Glass layer
                 Color.clear
                     .compatGlass(interactive: false, in: Rectangle())
                 
-                // Subtle vertical brand chroma tint (smooth, single fade)
-                LinearGradient(
-                    colors: [
-                        PackageResourceLookup.brandAccent.opacity(brandOpacity),
-                        .clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                // Smooth ambient tone for clean text contrast
+                // Smooth ambient tone for clean text contrast (single perfect fade)
                 LinearGradient(
                     colors: [
                         tintColor.opacity(tintOpacity),
@@ -613,12 +602,10 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             }
             .mask(
-                // A single, completely smooth mask without intermediate stops to prevent banding/hard edges
+                // A single, perfect top-to-bottom alpha fade.
+                // NO intermediate stops to guarantee zero banding or hard transition lines.
                 LinearGradient(
-                    stops: [
-                        .init(color: .white, location: 0.60), // Solid for the top ~38pt
-                        .init(color: .clear, location: 1.0),  // Seamless fade to 64pt
-                    ],
+                    colors: [.white, .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
