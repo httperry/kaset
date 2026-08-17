@@ -608,7 +608,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             )
         }
-        .frame(height: 68)
+        .frame(height: 84)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
