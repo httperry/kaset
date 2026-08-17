@@ -578,16 +578,16 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
     private var topBarBackground: some View {
         ZStack(alignment: .top) {
-            // Window drag handle in empty regions for native window movement & double-click zoom
+            // Window drag handle
             WindowDragHandle()
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
-            // Frosted Liquid Glass layer — multi-stop easing mask eliminates harsh cutoff
-            Color.clear
-                .compatGlass(interactive: false, in: Rectangle())
+            // Frosted material blur — zero geometric distortion, smooth Gaussian blur
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [
@@ -605,7 +605,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 )
 
-            // Subtle prismatic chromatic sheen, also feathered smoothly
+            // Prismatic chromatic sheen — gives iridescent personality without warping
             LinearGradient(
                 stops: [
                     .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.10 : 0.06), location: 0.0),
@@ -629,7 +629,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             )
 
-            // Ambient tone, gently fading
+            // Ambient tone
             LinearGradient(
                 stops: [
                     .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.09), location: 0.0),
