@@ -379,10 +379,11 @@ extension AppDelegate: NSWindowDelegate {
         guard let window = notification.object as? NSWindow,
               MainWindowLayout.isPrimaryWindow(window)
         else { return }
+        // macOS handles the autohiding titlebar + traffic lights natively in fullscreen.
+        // Keep titlebar transparent so the native overlay blends cleanly.
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.titlebarSeparatorStyle = .none
-        window.toolbar = nil
     }
 
     func windowDidExitFullScreen(_ notification: Notification) {

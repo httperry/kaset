@@ -456,13 +456,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    // Reserve space so scroll content starts below the floating topbar overlay.
-                    // 44 pt covers the 32 pt control row + gradient feather, in both windowed and fullscreen.
+                    // Reserve space so scroll content starts below the floating topbar overlay
+                    // in fullscreen mode (when the custom bar is visible).
                     .safeAreaInset(edge: .top) {
-                        Color.clear.frame(height: 44)
+                        Color.clear.frame(height: self.isFullScreen ? 44 : 0)
                     }
 
-                    self.topBarView
+                    // Floating custom topbar — only visible in fullscreen mode.
+                    // In windowed mode, the native SwiftUI toolbar owns these controls.
+                    if self.isFullScreen {
+                        self.topBarView
+                    }
                 }
             }
             .id(self.contentResetID)
@@ -502,6 +506,56 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar(removing: .sidebarToggle)
+        // Native SwiftUI toolbar — these items render inside the macOS titlebar in windowed mode.
+        // In fullscreen, they auto-hide with the traffic lights; the floating topBarView takes over.
+        .toolbar {
+            ToolbarItemGroup(placement: .navigation) {
+                if !self.isFullScreen {
+                    // Sidebar Toggle
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if self.columnVisibility == .all {
+                                self.columnVisibility = .detailOnly
+                            } else {
+                                self.columnVisibility = .all
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "sidebar.left")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .help(String(localized: "Toggle Sidebar"))
+                    .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+
+                    // Location Pill
+                    HStack(spacing: 6) {
+                        Image(systemName: self.currentNavigationIcon)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(self.currentNavigationTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .compatGlass(interactive: false, in: .capsule)
+                }
+            }
+
+            ToolbarItemGroup(placement: .primaryAction) {
+                if !self.isFullScreen, self.supportsCommandBarUI {
+                    Button {
+                        self.presentCommandBarIfAvailable()
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .keyboardShortcut("k", modifiers: .command)
+                    .help(String(localized: "Open Command Bar (⌘K)"))
+                    .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
+                }
+            }
+        }
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     }
 
     private var topBarView: some View {

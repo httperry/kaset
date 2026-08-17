@@ -56,7 +56,6 @@ enum MainWindowLayout {
         window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
-        window.toolbar = nil
     }
 
     /// Re-applies windowed-mode titlebar settings after exiting fullscreen.
@@ -68,7 +67,6 @@ enum MainWindowLayout {
         window.titlebarSeparatorStyle = .none
         window.styleMask.insert(.fullSizeContentView)
         window.isMovableByWindowBackground = false
-        window.toolbar = nil
     }
 
     /// Pure clamp used by both AppKit configuration and tests.
