@@ -117,10 +117,18 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
     }
 
     private var playerAreaFade: some View {
-        ZStack {
+        let tintColor = self.colorScheme == .dark ? Color.black : Color.white
+        let glassTint = self.colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.3)
+        let opacity1 = self.colorScheme == .dark ? 0.85 : 0.40
+        let opacity2 = self.colorScheme == .dark ? 0.65 : 0.25
+        let opacity3 = self.colorScheme == .dark ? 0.35 : 0.12
+        let opacity4 = self.colorScheme == .dark ? 0.12 : 0.04
+        let opacity5 = self.colorScheme == .dark ? 0.02 : 0.008
+
+        return ZStack {
             // Liquid glass blur layer with smooth feathered alpha mask
             Color.clear
-                .compatGlass(interactive: false, tint: Color.black.opacity(0.4), in: Rectangle())
+                .compatGlass(interactive: false, tint: glassTint, in: Rectangle())
                 .mask(
                     LinearGradient(
                         stops: [
@@ -136,14 +144,14 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
                     )
                 )
 
-            // Deep dark ambient gradient that dissolves seamlessly into the background
+            // Ambient gradient that dissolves seamlessly into the background
             LinearGradient(
                 stops: [
-                    .init(color: Color.black.opacity(0.85), location: 0.0),
-                    .init(color: Color.black.opacity(0.65), location: 0.25),
-                    .init(color: Color.black.opacity(0.35), location: 0.50),
-                    .init(color: Color.black.opacity(0.12), location: 0.70),
-                    .init(color: Color.black.opacity(0.02), location: 0.85),
+                    .init(color: tintColor.opacity(opacity1), location: 0.0),
+                    .init(color: tintColor.opacity(opacity2), location: 0.25),
+                    .init(color: tintColor.opacity(opacity3), location: 0.50),
+                    .init(color: tintColor.opacity(opacity4), location: 0.70),
+                    .init(color: tintColor.opacity(opacity5), location: 0.85),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .bottom,

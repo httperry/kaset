@@ -462,12 +462,17 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                         Color.clear.frame(height: self.isFullScreen ? 44 : 0)
                     }
 
+                    // Liquid Glass + ambient gradient background — ALWAYS rendered at the top
+                    // of the detail pane in both windowed and fullscreen modes.
+                    self.topBarBackground
+
                     // Floating custom topbar — only visible in fullscreen mode.
                     // In windowed mode, the native SwiftUI toolbar owns these controls.
                     if self.isFullScreen {
                         self.topBarView
                     }
                 }
+                .navigationTitle("")
             }
             .id(self.contentResetID)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -523,7 +528,12 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     } label: {
                         Image(systemName: "sidebar.left")
                             .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
+                    .compatGlass(interactive: true, in: .capsule)
                     .help(String(localized: "Toggle Sidebar"))
                     .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
 
@@ -535,8 +545,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                             .font(.system(size: 14, weight: .semibold))
                     }
                     .foregroundStyle(.primary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
                     .compatGlass(interactive: false, in: .capsule)
                 }
             }
@@ -548,7 +558,11 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     } label: {
                         Image(systemName: "sparkles")
                             .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .compatGlass(interactive: true, in: .circle)
                     }
+                    .buttonStyle(.plain)
                     .keyboardShortcut("k", modifiers: .command)
                     .help(String(localized: "Open Command Bar (⌘K)"))
                     .accessibilityIdentifier(AccessibilityID.MainWindow.aiButton)
@@ -556,6 +570,51 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             }
         }
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+    }
+
+    private var topBarBackground: some View {
+        ZStack(alignment: .top) {
+            // Window drag handle in empty regions for native window movement & double-click zoom
+            WindowDragHandle()
+                .allowsHitTesting(!self.isFullScreen)
+                .frame(height: 44)
+
+            let tintColor = self.colorScheme == .dark ? Color.black : Color.white
+
+            // Liquid Glass layer with feathered alpha mask
+            Color.clear
+                .compatGlass(interactive: false, in: Rectangle())
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.95), location: 0.0),
+                            .init(color: .white.opacity(0.85), location: 0.25),
+                            .init(color: .white.opacity(0.55), location: 0.50),
+                            .init(color: .white.opacity(0.20), location: 0.75),
+                            .init(color: .white.opacity(0.04), location: 0.90),
+                            .init(color: .clear, location: 1.0),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            // Ambient gradient overlay for clean contrast
+            LinearGradient(
+                stops: [
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.24 : 0.16), location: 0.0),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.10), location: 0.30),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.08 : 0.04), location: 0.60),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.008), location: 0.85),
+                    .init(color: .clear, location: 1.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .frame(height: 64)
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(!self.isFullScreen)
     }
 
     private var topBarView: some View {
@@ -616,49 +675,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .padding(.leading, self.isFullScreen ? 16 : (self.columnVisibility == .detailOnly ? 76 : 16))
         .padding(.trailing, 16)
         .frame(height: 44)
-        .background(alignment: .top) {
-            ZStack(alignment: .top) {
-                // Window drag handle in empty regions for native window movement & double-click zoom
-                WindowDragHandle()
-                    .allowsHitTesting(!self.isFullScreen)
-                    .frame(height: 44)
-
-                let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-
-                // Liquid Glass layer with feathered alpha mask
-                Color.clear
-                    .compatGlass(interactive: false, in: Rectangle())
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .white.opacity(0.95), location: 0.0),
-                                .init(color: .white.opacity(0.85), location: 0.25),
-                                .init(color: .white.opacity(0.55), location: 0.50),
-                                .init(color: .white.opacity(0.20), location: 0.75),
-                                .init(color: .white.opacity(0.04), location: 0.90),
-                                .init(color: .clear, location: 1.0),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-
-                // Ambient gradient overlay for clean contrast
-                LinearGradient(
-                    stops: [
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.24 : 0.16), location: 0.0),
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.10), location: 0.30),
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.08 : 0.04), location: 0.60),
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.008), location: 0.85),
-                        .init(color: .clear, location: 1.0),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .frame(height: 64)
-            .ignoresSafeArea(edges: .top)
-        }
         .ignoresSafeArea(edges: .top)
     }
 
