@@ -57,7 +57,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     @State private var selectedSidebarPinnedItem: SidebarPinnedItem?
     @State private var contentResetID = UUID()
     @State private var guestRefreshTask: Task<Void, Never>?
-    @AppStorage("debugTopBarTint") private var enableTopBarTint = true
 
     // MARK: - Cached ViewModels (persist across tab switches)
 
@@ -553,11 +552,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .compatGlass(interactive: false, in: .capsule)
-                    .onTapGesture {
-                        withAnimation {
-                            self.enableTopBarTint.toggle()
-                        }
-                    }
                 }
             }
 
@@ -590,17 +584,21 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .frame(height: 44)
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
+            let enableTint = true // 💡 TOGGLE THIS TO FALSE TO TEST WITHOUT TINT
 
-            // Liquid Glass layer with feathered alpha mask (tall bounds so glass edge fades fully out)
-            Color.clear
-                .compatGlass(interactive: false, in: Rectangle())
+            // Natural frosted blur layer (distortion-free, no "shifting")
+            // Extended downwards with an ultra-smooth fade to eliminate harsh lines/cutoffs
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .white.opacity(1.0), location: 0.0),
-                            .init(color: .white.opacity(0.90), location: 0.35),
-                            .init(color: .white.opacity(0.40), location: 0.60),
-                            .init(color: .white.opacity(0.08), location: 0.85),
+                            .init(color: .white, location: 0.0),
+                            .init(color: .white.opacity(0.95), location: 0.2),
+                            .init(color: .white.opacity(0.70), location: 0.4),
+                            .init(color: .white.opacity(0.40), location: 0.6),
+                            .init(color: .white.opacity(0.15), location: 0.8),
+                            .init(color: .white.opacity(0.04), location: 0.9),
                             .init(color: .clear, location: 1.0),
                         ],
                         startPoint: .top,
@@ -608,43 +606,21 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 )
 
-            if self.enableTopBarTint {
-                // Subtle prismatic chromatic sheen along the top glass
+            if enableTint {
+                // Smooth ambient tone overlay
                 LinearGradient(
                     stops: [
-                        .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.09 : 0.055), location: 0.0),
-                        .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.08 : 0.045), location: 0.35),
-                        .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.70),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.20 : 0.12), location: 0.0),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.12 : 0.06), location: 0.3),
+                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.05 : 0.02), location: 0.6),
                         .init(color: .clear, location: 1.0),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white.opacity(0.90), location: 0.0),
-                            .init(color: .white.opacity(0.35), location: 0.55),
-                            .init(color: .clear, location: 0.90),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-                // Ambient tone overlay for clean contrast
-                LinearGradient(
-                    stops: [
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.14 : 0.07), location: 0.0),
-                        .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.04 : 0.02), location: 0.50),
-                        .init(color: .clear, location: 0.80),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
         }
-        .frame(height: 120)
+        .frame(height: 110)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
@@ -662,11 +638,6 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             .padding(.horizontal, 12)
             .frame(height: 32)
             .compatGlass(interactive: false, in: .capsule)
-            .onTapGesture {
-                withAnimation {
-                    self.enableTopBarTint.toggle()
-                }
-            }
 
             // Leading and Trailing controls
             HStack {
