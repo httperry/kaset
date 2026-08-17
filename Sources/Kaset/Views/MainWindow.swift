@@ -583,15 +583,15 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
-            let tintColor = self.colorScheme == .dark ? Color.black : Color.clear
-            let tintOpacity: Double = self.colorScheme == .dark ? 0.20 : 0.0
+            let tintColor = self.colorScheme == .dark ? Color.black : Color.white
+            let tintOpacity: Double = self.colorScheme == .dark ? 0.20 : 0.12
 
             ZStack {
                 // Pure Liquid Glass layer
                 Color.clear
                     .compatGlass(interactive: false, in: Rectangle())
                 
-                // Subtle ambient tone for contrast in dark mode
+                // Subtle ambient tone for contrast (black in dark mode, white in light mode)
                 tintColor.opacity(tintOpacity)
             }
             .mask(
