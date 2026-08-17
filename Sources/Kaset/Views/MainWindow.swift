@@ -585,17 +585,15 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
-            // Frosted blur layer with feathered alpha mask (clean, distortion-free blur)
+            // Frosted blur layer with crisp feathered alpha mask (tightened height, no heavy fog)
             Rectangle()
                 .fill(.ultraThinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.92), location: 0.20),
-                            .init(color: .white.opacity(0.68), location: 0.45),
-                            .init(color: .white.opacity(0.32), location: 0.70),
-                            .init(color: .white.opacity(0.08), location: 0.88),
+                            .init(color: .white.opacity(0.85), location: 0.0),
+                            .init(color: .white.opacity(0.60), location: 0.55),
+                            .init(color: .white.opacity(0.20), location: 0.80),
                             .init(color: .clear, location: 1.0),
                         ],
                         startPoint: .top,
@@ -603,31 +601,18 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 )
 
-            // Subtle chromatic vibrancy overlay for rich glass aesthetic
+            // Subtle ambient tone overlay for clean contrast without heavy diffusion
             LinearGradient(
                 stops: [
-                    .init(color: PackageResourceLookup.brandAccent.opacity(self.colorScheme == .dark ? 0.12 : 0.07), location: 0.0),
-                    .init(color: PackageResourceLookup.brandAccent.opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.35),
-                    .init(color: .clear, location: 0.75),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            // Ambient tone overlay for clean contrast
-            LinearGradient(
-                stops: [
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.32 : 0.20), location: 0.0),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.20 : 0.12), location: 0.30),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.09 : 0.05), location: 0.60),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.01), location: 0.85),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.12 : 0.08), location: 0.0),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.05 : 0.03), location: 0.50),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
         }
-        .frame(height: 96)
+        .frame(height: 54)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
