@@ -585,32 +585,33 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
-            // Frosted glass material layer with ultra-smooth cubic fade (no harsh cutoff)
-            Rectangle()
-                .fill(.thinMaterial)
+            // Frosted Liquid Glass layer — multi-stop easing mask eliminates harsh cutoff
+            Color.clear
+                .compatGlass(interactive: false, in: Rectangle())
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.95), location: 0.25),
-                            .init(color: .white.opacity(0.70), location: 0.45),
-                            .init(color: .white.opacity(0.38), location: 0.65),
-                            .init(color: .white.opacity(0.12), location: 0.82),
-                            .init(color: .white.opacity(0.02), location: 0.94),
-                            .init(color: .clear, location: 1.0),
+                            .init(color: .white.opacity(0.98), location: 0.00),
+                            .init(color: .white.opacity(0.94), location: 0.18),
+                            .init(color: .white.opacity(0.82), location: 0.36),
+                            .init(color: .white.opacity(0.62), location: 0.54),
+                            .init(color: .white.opacity(0.38), location: 0.70),
+                            .init(color: .white.opacity(0.16), location: 0.84),
+                            .init(color: .white.opacity(0.04), location: 0.94),
+                            .init(color: .clear, location: 1.00),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
                 )
 
-            // Soft chromatic dispersion along the frosted surface
+            // Subtle prismatic chromatic sheen, also feathered smoothly
             LinearGradient(
                 stops: [
-                    .init(color: Color(red: 0.42, green: 0.68, blue: 0.98).opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.0),
-                    .init(color: Color(red: 0.68, green: 0.45, blue: 0.95).opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.35),
-                    .init(color: Color(red: 0.95, green: 0.38, blue: 0.65).opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.70),
-                    .init(color: .clear, location: 1.0),
+                    .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.10 : 0.06), location: 0.0),
+                    .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.08 : 0.05), location: 0.40),
+                    .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.72),
+                    .init(color: .clear, location: 1.00),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -618,28 +619,29 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             .mask(
                 LinearGradient(
                     stops: [
-                        .init(color: .white.opacity(0.80), location: 0.0),
-                        .init(color: .white.opacity(0.30), location: 0.50),
-                        .init(color: .clear, location: 0.85),
+                        .init(color: .white.opacity(0.88), location: 0.00),
+                        .init(color: .white.opacity(0.55), location: 0.50),
+                        .init(color: .white.opacity(0.18), location: 0.78),
+                        .init(color: .clear, location: 1.00),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
 
-            // Smooth ambient gradient for natural depth
+            // Ambient tone, gently fading
             LinearGradient(
                 stops: [
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.18 : 0.10), location: 0.0),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.08 : 0.04), location: 0.40),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.01 : 0.005), location: 0.75),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.09), location: 0.0),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.45),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.01), location: 0.75),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
         }
-        .frame(height: 72)
+        .frame(height: 68)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
