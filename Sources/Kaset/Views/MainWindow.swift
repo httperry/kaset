@@ -584,29 +584,24 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .frame(height: 44)
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.clear
-            let tintOpacity: Double = self.colorScheme == .dark ? 0.35 : 0.0
+            let tintOpacity: Double = self.colorScheme == .dark ? 0.20 : 0.0
 
             ZStack {
-                // Base Liquid Glass layer with tint applied directly to the glass
+                // Pure Liquid Glass layer
                 Color.clear
-                    .compatGlass(
-                        interactive: false,
-                        tint: self.colorScheme == .dark ? Color.black : nil,
-                        in: Rectangle()
-                    )
+                    .compatGlass(interactive: false, in: Rectangle())
                 
-                // Uniform ambient tone across the entire glass layer (no premature tint fade)
+                // Subtle ambient tone for contrast in dark mode
                 tintColor.opacity(tintOpacity)
             }
             .mask(
-                // Single continuous gradient starting at 50% opacity (50% transparency) at the top
-                // and fading to 100% transparency (.clear) at the bottom edge
+                // Top at 25% transparency (75% opacity), fading smoothly to 100% transparency (.clear) at bottom
                 LinearGradient(
-                    colors: [
-                        .white.opacity(0.50),
-                        .white.opacity(0.35),
-                        .white.opacity(0.18),
-                        .clear
+                    stops: [
+                        .init(color: .white.opacity(0.75), location: 0.0),
+                        .init(color: .white.opacity(0.55), location: 0.45),
+                        .init(color: .white.opacity(0.25), location: 0.75),
+                        .init(color: .clear, location: 1.0),
                     ],
                     startPoint: .top,
                     endPoint: .bottom
