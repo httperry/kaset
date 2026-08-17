@@ -583,24 +583,29 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
+            let tintColor = self.colorScheme == .dark ? Color.black : Color.clear
+            let tintOpacity: Double = self.colorScheme == .dark ? 0.35 : 0.0
+
             ZStack {
-                // Base Liquid Glass layer
+                // Base Liquid Glass layer with tint applied directly to the glass
                 Color.clear
-                    .compatGlass(interactive: false, in: Rectangle())
+                    .compatGlass(
+                        interactive: false,
+                        tint: self.colorScheme == .dark ? Color.black : nil,
+                        in: Rectangle()
+                    )
                 
-                // Very subtle ambient contrast if in dark mode
-                if self.colorScheme == .dark {
-                    Color.black.opacity(0.15)
-                }
+                // Uniform ambient tone across the entire glass layer (no premature tint fade)
+                tintColor.opacity(tintOpacity)
             }
             .mask(
-                // Soft 50% opacity at the top fading to 100% transparent (0.0) at the bottom
+                // Single continuous gradient starting at 50% opacity (50% transparency) at the top
+                // and fading to 100% transparency (.clear) at the bottom edge
                 LinearGradient(
                     colors: [
                         .white.opacity(0.50),
-                        .white.opacity(0.38),
-                        .white.opacity(0.24),
-                        .white.opacity(0.08),
+                        .white.opacity(0.35),
+                        .white.opacity(0.18),
                         .clear
                     ],
                     startPoint: .top,
