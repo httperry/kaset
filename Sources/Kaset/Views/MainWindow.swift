@@ -583,65 +583,44 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
-            let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-
-            // Frosted material blur — zero geometric distortion, smooth Gaussian blur
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white.opacity(0.98), location: 0.00),
-                            .init(color: .white.opacity(0.94), location: 0.18),
-                            .init(color: .white.opacity(0.82), location: 0.36),
-                            .init(color: .white.opacity(0.62), location: 0.54),
-                            .init(color: .white.opacity(0.38), location: 0.70),
-                            .init(color: .white.opacity(0.16), location: 0.84),
-                            .init(color: .white.opacity(0.04), location: 0.94),
-                            .init(color: .clear, location: 1.00),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+            // Natural blur — full-opacity material over toolbar zone, tiny feather at bottom only
+            VStack(spacing: 0) {
+                // Solid blur region covering the toolbar (no fading, content just blurs naturally)
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .frame(height: 38)
+                // Short feather transition — prevents a hard cut line
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .white, location: 0.0),
+                                .init(color: .white.opacity(0.6), location: 0.4),
+                                .init(color: .white.opacity(0.15), location: 0.75),
+                                .init(color: .clear, location: 1.0),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
-                )
+                    .frame(height: 14)
+            }
 
-            // Prismatic chromatic sheen — gives iridescent personality without warping
+            // Prismatic chromatic sheen — just over the solid toolbar zone
             LinearGradient(
                 stops: [
                     .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.10 : 0.06), location: 0.0),
-                    .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.08 : 0.05), location: 0.40),
-                    .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.72),
-                    .init(color: .clear, location: 1.00),
+                    .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.50),
+                    .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.85),
+                    .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(0.88), location: 0.00),
-                        .init(color: .white.opacity(0.55), location: 0.50),
-                        .init(color: .white.opacity(0.18), location: 0.78),
-                        .init(color: .clear, location: 1.00),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-
-            // Ambient tone
-            LinearGradient(
-                stops: [
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.09), location: 0.0),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.45),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.01), location: 0.75),
-                    .init(color: .clear, location: 1.0),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            .frame(height: 38)
         }
-        .frame(height: 68)
+        .frame(height: 52)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
