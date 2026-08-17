@@ -156,7 +156,7 @@ struct YouTubePlayerBar: View {
                 endPoint: .top
             )
         }
-        .frame(height: 180)
+        .frame(height: 135)
         .frame(maxWidth: .infinity)
         .padding(.bottom, -8)
         .ignoresSafeArea(edges: .bottom)
