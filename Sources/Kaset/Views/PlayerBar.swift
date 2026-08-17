@@ -126,9 +126,9 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
         let opacity5 = self.colorScheme == .dark ? 0.02 : 0.008
 
         return ZStack {
-            // Liquid glass blur layer with smooth feathered alpha mask
-            Color.clear
-                .compatGlass(interactive: false, tint: glassTint, in: Rectangle())
+            // Material blur layer with smooth feathered alpha mask (distortion-free)
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [

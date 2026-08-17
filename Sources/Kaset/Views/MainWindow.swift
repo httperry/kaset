@@ -585,9 +585,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
 
-            // Liquid Glass layer with feathered alpha mask
-            Color.clear
-                .compatGlass(interactive: false, in: Rectangle())
+            // Frosted blur layer with feathered alpha mask (clean, distortion-free blur)
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .mask(
                     LinearGradient(
                         stops: [
