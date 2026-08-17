@@ -488,15 +488,12 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { _ in
                 self.isFullScreen = true
-                self.columnVisibility = .detailOnly
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
                 self.isFullScreen = false
             }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { _ in
                 self.isFullScreen = false
-                // Restore sidebar when returning to windowed mode.
-                self.columnVisibility = .all
             }
             .onAppear {
                 if let window = NSApplication.shared.windows.first(where: { MainWindowLayout.isPrimaryWindow($0) }) {
