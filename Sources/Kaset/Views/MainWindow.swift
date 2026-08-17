@@ -583,42 +583,43 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
-            // Natural blur — full-opacity material over toolbar zone, tiny feather at bottom only
-            VStack(spacing: 0) {
-                // Solid blur region covering the toolbar (no fading, content just blurs naturally)
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .frame(height: 38)
-                // Short feather transition — prevents a hard cut line
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .white, location: 0.0),
-                                .init(color: .white.opacity(0.6), location: 0.4),
-                                .init(color: .white.opacity(0.15), location: 0.75),
-                                .init(color: .clear, location: 1.0),
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+            // Natural, seamless frosted glass blur — continuous smooth falloff without any chunky solid blocks
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0.0),
+                            .init(color: .white.opacity(0.85), location: 0.35),
+                            .init(color: .white.opacity(0.40), location: 0.70),
+                            .init(color: .clear, location: 1.0),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                    .frame(height: 14)
-            }
+                )
 
-            // Prismatic chromatic sheen — just over the solid toolbar zone
+            // Delicate chromatic sheen
             LinearGradient(
                 stops: [
-                    .init(color: Color(red: 0.38, green: 0.65, blue: 0.98).opacity(self.colorScheme == .dark ? 0.10 : 0.06), location: 0.0),
-                    .init(color: Color(red: 0.62, green: 0.42, blue: 0.95).opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.50),
-                    .init(color: Color(red: 0.95, green: 0.35, blue: 0.65).opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.85),
-                    .init(color: .clear, location: 1.0),
+                    .init(color: Color.cyan.opacity(self.colorScheme == .dark ? 0.07 : 0.04), location: 0.0),
+                    .init(color: Color.purple.opacity(self.colorScheme == .dark ? 0.06 : 0.03), location: 0.50),
+                    .init(color: Color.pink.opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 1.0),
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                startPoint: .leading,
+                endPoint: .trailing
             )
-            .frame(height: 38)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .white.opacity(0.8), location: 0.0),
+                        .init(color: .white.opacity(0.3), location: 0.6),
+                        .init(color: .clear, location: 1.0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
         .frame(height: 52)
         .ignoresSafeArea(edges: .top)
