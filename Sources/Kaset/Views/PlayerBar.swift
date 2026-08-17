@@ -118,47 +118,37 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
 
     private var playerAreaFade: some View {
         let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-        let glassTint = self.colorScheme == .dark ? Color.black.opacity(0.4) : Color.white.opacity(0.3)
-        let opacity1 = self.colorScheme == .dark ? 0.85 : 0.40
-        let opacity2 = self.colorScheme == .dark ? 0.65 : 0.25
-        let opacity3 = self.colorScheme == .dark ? 0.35 : 0.12
-        let opacity4 = self.colorScheme == .dark ? 0.12 : 0.04
-        let opacity5 = self.colorScheme == .dark ? 0.02 : 0.008
+        let bottomTintOpacity: Double = self.colorScheme == .dark ? 0.50 : 0.30
 
-        return ZStack {
-            // Material blur layer with smooth feathered alpha mask (distortion-free)
-            Rectangle()
-                .fill(.ultraThinMaterial)
+        return ZStack(alignment: .bottom) {
+            // 1. Pure Liquid Glass layer: 0% transparency (full strength) at bottom, fading to 100% transparent at top
+            Color.clear
+                .compatGlass(interactive: false, in: Rectangle())
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.85), location: 0.25),
-                            .init(color: .white.opacity(0.50), location: 0.50),
-                            .init(color: .white.opacity(0.18), location: 0.70),
-                            .init(color: .white.opacity(0.03), location: 0.85),
-                            .init(color: .clear, location: 1.0),
+                            .init(color: .white, location: 0.0), // Full strength glass at bottom
+                            .init(color: .white.opacity(0.80), location: 0.45),
+                            .init(color: .white.opacity(0.30), location: 0.75),
+                            .init(color: .clear, location: 1.0), // 100% transparent at top
                         ],
                         startPoint: .bottom,
                         endPoint: .top
                     )
                 )
 
-            // Ambient gradient that dissolves seamlessly into the background
+            // 2. Color tint layer: 50% transparent near bottom, fading to 100% transparent (.clear) at top
             LinearGradient(
                 stops: [
-                    .init(color: tintColor.opacity(opacity1), location: 0.0),
-                    .init(color: tintColor.opacity(opacity2), location: 0.25),
-                    .init(color: tintColor.opacity(opacity3), location: 0.50),
-                    .init(color: tintColor.opacity(opacity4), location: 0.70),
-                    .init(color: tintColor.opacity(opacity5), location: 0.85),
+                    .init(color: tintColor.opacity(bottomTintOpacity), location: 0.0),
+                    .init(color: tintColor.opacity(bottomTintOpacity * 0.70), location: 0.45),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .bottom,
                 endPoint: .top
             )
         }
-        .frame(height: 150)
+        .frame(height: 180)
         .frame(maxWidth: .infinity)
         .padding(.bottom, -8)
         .ignoresSafeArea(edges: .bottom)
