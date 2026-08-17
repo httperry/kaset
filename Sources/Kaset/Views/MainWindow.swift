@@ -584,14 +584,14 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .frame(height: 44)
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-            let tintOpacity = self.colorScheme == .dark ? 0.35 : 0.15
+            let tintOpacity = self.colorScheme == .dark ? 0.35 : 0.0 // Removed extra lightening in light mode
 
             ZStack {
                 // Base Liquid Glass layer
                 Color.clear
                     .compatGlass(interactive: false, in: Rectangle())
                 
-                // Smooth ambient tone for clean text contrast
+                // Smooth ambient tone for clean text contrast (only in dark mode)
                 LinearGradient(
                     colors: [
                         tintColor.opacity(tintOpacity),
@@ -602,29 +602,26 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             }
             .mask(
-                // A pure smoothstep (ease-in-out) cubic curve to eliminate ANY visual banding or slope lines,
-                // scaled precisely for a 72pt frame. The top 40pt (55%) remains solid to cover window controls,
-                // and the remaining 32pt smoothly fades out to prevent the sharp cutoff line.
+                // Scaled to a tight 64pt frame.
+                // The curve hits exactly 0.0 opacity at 90% (57pt) and stays clear until 100% (64pt).
+                // This 7pt "clear buffer" completely hides the physical glass rim/edge from rendering.
                 LinearGradient(
                     stops: [
-                        .init(color: .white, location: 0.55),
-                        .init(color: .white.opacity(0.97), location: 0.595),
-                        .init(color: .white.opacity(0.90), location: 0.64),
-                        .init(color: .white.opacity(0.78), location: 0.685),
-                        .init(color: .white.opacity(0.65), location: 0.73),
-                        .init(color: .white.opacity(0.50), location: 0.775),
-                        .init(color: .white.opacity(0.35), location: 0.82),
-                        .init(color: .white.opacity(0.22), location: 0.865),
-                        .init(color: .white.opacity(0.10), location: 0.91),
-                        .init(color: .white.opacity(0.03), location: 0.955),
-                        .init(color: .clear, location: 1.0),
+                        .init(color: .white, location: 0.62),
+                        .init(color: .white.opacity(0.93), location: 0.66),
+                        .init(color: .white.opacity(0.78), location: 0.70),
+                        .init(color: .white.opacity(0.50), location: 0.76),
+                        .init(color: .white.opacity(0.22), location: 0.82),
+                        .init(color: .white.opacity(0.07), location: 0.86),
+                        .init(color: .clear, location: 0.90), // Reaches pure clear BEFORE the frame ends
+                        .init(color: .clear, location: 1.0),  // Buffer zone
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
         }
-        .frame(height: 72)
+        .frame(height: 64)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
