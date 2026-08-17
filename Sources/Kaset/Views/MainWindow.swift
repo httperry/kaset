@@ -583,35 +583,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
-            let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-            let topTintOpacity: Double = self.colorScheme == .dark ? 0.50 : 0.30
-
-            // 1. Pure Liquid Glass layer: 0% transparency (full strength) at top, fading to 100% transparent at bottom
-            Color.clear
-                .compatGlass(interactive: false, in: Rectangle())
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white, location: 0.0), // 0% transparency at top
-                            .init(color: .white.opacity(0.80), location: 0.50),
-                            .init(color: .white.opacity(0.30), location: 0.80),
-                            .init(color: .clear, location: 1.0), // 100% transparency at bottom
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-            // 2. Color tint layer: 50% transparent near top, fading to 100% transparent (.clear) at bottom
-            LinearGradient(
-                stops: [
-                    .init(color: tintColor.opacity(topTintOpacity), location: 0.0),
-                    .init(color: tintColor.opacity(topTintOpacity * 0.70), location: 0.45),
-                    .init(color: .clear, location: 1.0),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            LiquidGlassFade(edge: .top, height: 64)
         }
         .frame(height: 64)
         .ignoresSafeArea(edges: .top)

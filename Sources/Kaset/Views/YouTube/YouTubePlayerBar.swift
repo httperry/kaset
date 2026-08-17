@@ -125,43 +125,8 @@ struct YouTubePlayerBar: View {
     }
 
     private var playerAreaFade: some View {
-        let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-        let bottomTintOpacity: Double = self.colorScheme == .dark ? 0.50 : 0.30
-
-        return ZStack(alignment: .bottom) {
-            // 1. Pure Liquid Glass layer: 0% transparency (full strength) at bottom, fading to 100% transparent at top
-            Color.clear
-                .compatGlass(interactive: false, in: Rectangle())
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white, location: 0.0), // Full strength glass at bottom
-                            .init(color: .white.opacity(0.80), location: 0.45),
-                            .init(color: .white.opacity(0.30), location: 0.75),
-                            .init(color: .clear, location: 1.0), // 100% transparent at top
-                        ],
-                        startPoint: .bottom,
-                        endPoint: .top
-                    )
-                )
-
-            // 2. Color tint layer: 50% transparent near bottom, fading to 100% transparent (.clear) at top
-            LinearGradient(
-                stops: [
-                    .init(color: tintColor.opacity(bottomTintOpacity), location: 0.0),
-                    .init(color: tintColor.opacity(bottomTintOpacity * 0.70), location: 0.45),
-                    .init(color: .clear, location: 1.0),
-                ],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-        }
-        .frame(height: 135)
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, -8)
-        .ignoresSafeArea(edges: .bottom)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        LiquidGlassFade(edge: .bottom, height: 135)
+            .padding(.bottom, -8)
     }
 
     // MARK: - Updated Player Layout
