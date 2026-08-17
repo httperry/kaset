@@ -584,31 +584,36 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .frame(height: 44)
 
             let tintColor = self.colorScheme == .dark ? Color.black : Color.white
-            let tintOpacity: Double = self.colorScheme == .dark ? 0.20 : 0.12
+            let topTintOpacity: Double = self.colorScheme == .dark ? 0.50 : 0.30
 
-            ZStack {
-                // Pure Liquid Glass layer
-                Color.clear
-                    .compatGlass(interactive: false, in: Rectangle())
-                
-                // Subtle ambient tone for contrast (black in dark mode, white in light mode)
-                tintColor.opacity(tintOpacity)
-            }
-            .mask(
-                // Top at 25% transparency (75% opacity), fading smoothly to 100% transparency (.clear) at bottom
-                LinearGradient(
-                    stops: [
-                        .init(color: .white.opacity(0.75), location: 0.0),
-                        .init(color: .white.opacity(0.60), location: 0.50),
-                        .init(color: .white.opacity(0.25), location: 0.80),
-                        .init(color: .clear, location: 1.0),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
+            // 1. Pure Liquid Glass layer: 0% transparency (full strength) at top, fading to 100% transparent at bottom
+            Color.clear
+                .compatGlass(interactive: false, in: Rectangle())
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .white, location: 0.0), // 0% transparency at top
+                            .init(color: .white.opacity(0.80), location: 0.50),
+                            .init(color: .white.opacity(0.30), location: 0.80),
+                            .init(color: .clear, location: 1.0), // 100% transparency at bottom
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
+
+            // 2. Color tint layer: 50% transparent near top, fading to 100% transparent (.clear) at bottom
+            LinearGradient(
+                stops: [
+                    .init(color: tintColor.opacity(topTintOpacity), location: 0.0),
+                    .init(color: tintColor.opacity(topTintOpacity * 0.70), location: 0.45),
+                    .init(color: .clear, location: 1.0),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
         }
-        .frame(height: 84)
+        .frame(height: 64)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
