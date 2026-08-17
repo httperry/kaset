@@ -603,19 +603,20 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             }
             .mask(
                 // A pure smoothstep (ease-in-out) cubic curve to eliminate ANY visual banding or slope lines,
-                // fading to perfectly clear before the frame boundary to eliminate the sharp cutoff line.
+                // scaled precisely for a 72pt frame. The top 40pt (55%) remains solid to cover window controls,
+                // and the remaining 32pt smoothly fades out to prevent the sharp cutoff line.
                 LinearGradient(
                     stops: [
-                        .init(color: .white, location: 0.45),
-                        .init(color: .white.opacity(0.97), location: 0.50),
-                        .init(color: .white.opacity(0.90), location: 0.55),
-                        .init(color: .white.opacity(0.78), location: 0.61),
-                        .init(color: .white.opacity(0.65), location: 0.66),
-                        .init(color: .white.opacity(0.50), location: 0.72),
-                        .init(color: .white.opacity(0.35), location: 0.78),
-                        .init(color: .white.opacity(0.22), location: 0.83),
-                        .init(color: .white.opacity(0.10), location: 0.89),
-                        .init(color: .white.opacity(0.03), location: 0.94),
+                        .init(color: .white, location: 0.55),
+                        .init(color: .white.opacity(0.97), location: 0.595),
+                        .init(color: .white.opacity(0.90), location: 0.64),
+                        .init(color: .white.opacity(0.78), location: 0.685),
+                        .init(color: .white.opacity(0.65), location: 0.73),
+                        .init(color: .white.opacity(0.50), location: 0.775),
+                        .init(color: .white.opacity(0.35), location: 0.82),
+                        .init(color: .white.opacity(0.22), location: 0.865),
+                        .init(color: .white.opacity(0.10), location: 0.91),
+                        .init(color: .white.opacity(0.03), location: 0.955),
                         .init(color: .clear, location: 1.0),
                     ],
                     startPoint: .top,
@@ -623,7 +624,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             )
         }
-        .frame(height: 88)
+        .frame(height: 72)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
