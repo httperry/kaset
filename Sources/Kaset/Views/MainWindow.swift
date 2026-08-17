@@ -592,11 +592,11 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 Color.clear
                     .compatGlass(interactive: false, in: Rectangle())
                 
-                // Subtle vertical brand chroma tint (smooth, no banding)
+                // Subtle vertical brand chroma tint (smooth, single fade)
                 LinearGradient(
-                    stops: [
-                        .init(color: PackageResourceLookup.brandAccent.opacity(brandOpacity), location: 0.0),
-                        .init(color: .clear, location: 1.0),
+                    colors: [
+                        PackageResourceLookup.brandAccent.opacity(brandOpacity),
+                        .clear
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -604,22 +604,20 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
 
                 // Smooth ambient tone for clean text contrast
                 LinearGradient(
-                    stops: [
-                        .init(color: tintColor.opacity(tintOpacity), location: 0.0),
-                        .init(color: .clear, location: 1.0),
+                    colors: [
+                        tintColor.opacity(tintOpacity),
+                        .clear
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
             .mask(
-                // A single, buttery smooth mask for all visual layers to eliminate harsh refractive edges
+                // A single, completely smooth mask without intermediate stops to prevent banding/hard edges
                 LinearGradient(
                     stops: [
-                        .init(color: .white, location: 0.0),
-                        .init(color: .white.opacity(0.85), location: 0.40),
-                        .init(color: .white.opacity(0.30), location: 0.70),
-                        .init(color: .clear, location: 1.0),
+                        .init(color: .white, location: 0.60), // Solid for the top ~38pt
+                        .init(color: .clear, location: 1.0),  // Seamless fade to 64pt
                     ],
                     startPoint: .top,
                     endPoint: .bottom
