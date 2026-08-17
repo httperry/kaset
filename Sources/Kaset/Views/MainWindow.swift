@@ -546,10 +546,11 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     HStack(spacing: 6) {
                         Image(systemName: self.currentNavigationIcon)
                             .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(PackageResourceLookup.brandAccent)
                         Text(self.currentNavigationTitle)
                             .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
                     }
-                    .foregroundStyle(.primary)
                     .padding(.horizontal, 12)
                     .frame(height: 32)
                     .compatGlass(interactive: false, in: .capsule)
@@ -599,10 +600,11 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             HStack(spacing: 6) {
                 Image(systemName: self.currentNavigationIcon)
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(PackageResourceLookup.brandAccent)
                 Text(self.currentNavigationTitle)
                     .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
             }
-            .foregroundStyle(.primary)
             .padding(.horizontal, 12)
             .frame(height: 32)
             .compatGlass(interactive: false, in: .capsule)
