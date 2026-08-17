@@ -31,7 +31,7 @@ struct NewReleasesView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .localizedNavigationTitle("New Releases")
+            .navigationTitle("")
             .navigationDestinations(
                 client: self.viewModel.client,
                 playerBarNavigationAction: self.playerBarNavigationAction

@@ -34,7 +34,7 @@ struct HomeView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .localizedNavigationTitle("Home")
+            .navigationTitle("")
             .navigationDestinations(
                 client: self.viewModel.client,
                 playerBarNavigationAction: self.playerBarNavigationAction

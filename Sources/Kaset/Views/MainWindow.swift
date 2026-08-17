@@ -591,11 +591,11 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .white.opacity(0.95), location: 0.0),
-                            .init(color: .white.opacity(0.85), location: 0.25),
-                            .init(color: .white.opacity(0.55), location: 0.50),
-                            .init(color: .white.opacity(0.20), location: 0.75),
-                            .init(color: .white.opacity(0.04), location: 0.90),
+                            .init(color: .white, location: 0.0),
+                            .init(color: .white.opacity(0.92), location: 0.20),
+                            .init(color: .white.opacity(0.68), location: 0.45),
+                            .init(color: .white.opacity(0.32), location: 0.70),
+                            .init(color: .white.opacity(0.08), location: 0.88),
                             .init(color: .clear, location: 1.0),
                         ],
                         startPoint: .top,
@@ -603,20 +603,31 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     )
                 )
 
-            // Ambient gradient overlay for clean contrast
+            // Subtle chromatic vibrancy overlay for rich glass aesthetic
             LinearGradient(
                 stops: [
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.24 : 0.16), location: 0.0),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.16 : 0.10), location: 0.30),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.08 : 0.04), location: 0.60),
-                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.008), location: 0.85),
+                    .init(color: PackageResourceLookup.brandAccent.opacity(self.colorScheme == .dark ? 0.12 : 0.07), location: 0.0),
+                    .init(color: PackageResourceLookup.brandAccent.opacity(self.colorScheme == .dark ? 0.05 : 0.025), location: 0.35),
+                    .init(color: .clear, location: 0.75),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            // Ambient tone overlay for clean contrast
+            LinearGradient(
+                stops: [
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.32 : 0.20), location: 0.0),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.20 : 0.12), location: 0.30),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.09 : 0.05), location: 0.60),
+                    .init(color: tintColor.opacity(self.colorScheme == .dark ? 0.02 : 0.01), location: 0.85),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
         }
-        .frame(height: 64)
+        .frame(height: 96)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }

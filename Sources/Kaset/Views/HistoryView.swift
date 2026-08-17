@@ -34,7 +34,7 @@ struct HistoryView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .localizedNavigationTitle("Listening History")
+            .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .automatic) {
                     Button {
