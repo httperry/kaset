@@ -583,21 +583,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 .allowsHitTesting(!self.isFullScreen)
                 .frame(height: 44)
 
-            // Natural, seamless frosted glass blur — continuous smooth falloff without any chunky solid blocks
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.85), location: 0.35),
-                            .init(color: .white.opacity(0.40), location: 0.70),
-                            .init(color: .clear, location: 1.0),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            // True Variable Gaussian Blur — smoothly decreases Gaussian blur radius from 24px to 0px
+            // 100% full pixel opacity, zero milkiness/fading, zero geometric distortion.
+            VariableBlurView(maxBlurRadius: 24)
 
             // Delicate chromatic sheen
             LinearGradient(
