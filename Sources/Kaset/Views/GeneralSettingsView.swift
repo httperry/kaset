@@ -50,10 +50,6 @@ struct GeneralSettingsView: View {
                 Toggle("Haptic Feedback", isOn: self.$settings.hapticFeedbackEnabled)
                     .help(String(localized: "Provide tactile feedback for actions on Force Touch trackpads"))
 
-                // Topbar Ambient Tint
-                Toggle(String(localized: "Topbar Ambient Tint"), isOn: self.$settings.topbarAmbientTintEnabled)
-                    .help(String(localized: "Enables subtle ambient tinting and chromatic refraction over the top bar glass."))
-
                 // Default Launch Page
                 Picker(String(localized: "Default Page on Launch"), selection: self.$settings.defaultLaunchPage) {
                     ForEach(SettingsManager.LaunchPage.allCases) { page in

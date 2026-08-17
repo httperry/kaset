@@ -36,7 +36,6 @@ final class SettingsManager {
         static let popOutVideoOnNavigateAway = "settings.popOutVideoOnNavigateAway"
         static let audioFadingEnabled = "settings.audioFadingEnabled"
         static let audioFadeDuration = "settings.audioFadeDuration"
-        static let topbarAmbientTintEnabled = "settings.topbarAmbientTintEnabled"
         #if DEBUG
             static let useLegacyMacOS15UI = "settings.debug.useLegacyMacOS15UI"
         #endif
@@ -484,13 +483,6 @@ final class SettingsManager {
         return preferredStyle
     }
 
-    /// Whether subtle ambient tinting and chromatic refraction are active on the top bar glass.
-    var topbarAmbientTintEnabled: Bool {
-        didSet {
-            UserDefaults.standard.set(self.topbarAmbientTintEnabled, forKey: Keys.topbarAmbientTintEnabled)
-        }
-    }
-
     /// The language used for the app interface and API content.
     var contentLanguage: ContentLanguage {
         didSet {
@@ -523,7 +515,6 @@ final class SettingsManager {
         self.showNowPlayingNotifications = UserDefaults.standard.object(forKey: Keys.showNowPlayingNotifications) as? Bool ?? true
         self.hapticFeedbackEnabled = UserDefaults.standard.object(forKey: Keys.hapticFeedbackEnabled) as? Bool ?? true
         self.rememberPlaybackSettings = UserDefaults.standard.object(forKey: Keys.rememberPlaybackSettings) as? Bool ?? false
-        self.topbarAmbientTintEnabled = UserDefaults.standard.object(forKey: Keys.topbarAmbientTintEnabled) as? Bool ?? true
 
         // Load per-service enabled flags, migrating from legacy lastFMEnabled if needed
         if let stored = UserDefaults.standard.dictionary(forKey: Keys.enabledServices) as? [String: Bool] {
