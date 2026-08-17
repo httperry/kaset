@@ -599,8 +599,8 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 LinearGradient(
                     stops: [
                         .init(color: .white.opacity(0.75), location: 0.0),
-                        .init(color: .white.opacity(0.55), location: 0.45),
-                        .init(color: .white.opacity(0.25), location: 0.75),
+                        .init(color: .white.opacity(0.60), location: 0.50),
+                        .init(color: .white.opacity(0.25), location: 0.80),
                         .init(color: .clear, location: 1.0),
                     ],
                     startPoint: .top,
@@ -608,7 +608,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                 )
             )
         }
-        .frame(height: 56)
+        .frame(height: 68)
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(!self.isFullScreen)
     }
