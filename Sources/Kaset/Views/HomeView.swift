@@ -53,9 +53,6 @@ struct HomeView: View {
                 }
             }
         }
-        .refreshable {
-            await self.viewModel.refresh()
-        }
         .popsNavigationStackOnSidebarReselect(path: self.$navigationPath, for: .home)
     }
 
@@ -108,6 +105,9 @@ struct HomeView: View {
             .padding(.bottom, 20)
         }
         .accessibilityIdentifier(AccessibilityID.Home.scrollView)
+        .pullToRefresh {
+            await self.viewModel.refresh()
+        }
     }
 
     private var loadMoreControl: some View {
