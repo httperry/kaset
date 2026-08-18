@@ -23,15 +23,6 @@ final class AudioFaderService {
         }
     }
 
-    private var activeTimer: Timer?
-    private var currentStep: Int = 0
-    private var totalSteps: Int = 20
-    private var initialVolume: Double = 1.0
-    private var targetVolume: Double = 0.0
-    private var isFadeOut: Bool = true
-    private var curve: FadeCurve = .logarithmic
-    private var onComplete: (@MainActor () -> Void)?
-
     private init() {}
 
     /// Fades volume from current level to zero over specified duration with optional completion handler.
@@ -46,30 +37,19 @@ final class AudioFaderService {
             return
         }
 
-        let durationMs = Int(duration * 1000)
-        let exponent = curve == .logarithmic ? 2.0 : 1.0
+        let durationMs = max(1, Int(duration * 1000))
+        let isLogarithmic = curve == .logarithmic
         let script = """
             (function() {
                 const video = document.querySelector('video');
-                if (!video) return;
-                if (window.__kasetFadeInterval) {
-                    clearInterval(window.__kasetFadeInterval);
-                    window.__kasetFadeInterval = null;
+                const startVol = (video && video.volume > 0)
+                    ? video.volume
+                    : (typeof window.__kasetTargetVolume === 'number' ? window.__kasetTargetVolume : 1.0);
+                if (window.__kasetAudio) {
+                    window.__kasetAudio.fadeRamp(startVol, 0.0, \(durationMs), \(isLogarithmic), null);
+                } else if (video) {
+                    video.volume = 0.0;
                 }
-                const startVol = video.volume;
-                const durationMs = \(durationMs);
-                const startTime = performance.now();
-                window.__kasetFadeInterval = setInterval(() => {
-                    const elapsed = performance.now() - startTime;
-                    const progress = Math.min(1.0, elapsed / durationMs);
-                    const factor = Math.pow(progress, \(exponent));
-                    video.volume = Math.max(0.0, startVol * (1.0 - factor));
-                    if (progress >= 1.0) {
-                        clearInterval(window.__kasetFadeInterval);
-                        window.__kasetFadeInterval = null;
-                        video.volume = 0.0;
-                    }
-                }, 16);
             })();
         """
         webView.evaluateJavaScript(script) { _, _ in
@@ -93,32 +73,17 @@ final class AudioFaderService {
             return
         }
 
-        let durationMs = Int(duration * 1000)
-        let exponent = curve == .logarithmic ? 2.0 : 1.0
+        let durationMs = max(1, Int(duration * 1000))
+        let isLogarithmic = curve == .logarithmic
         let target = max(0.0, min(1.0, targetVolume))
         let script = """
             (function() {
-                const video = document.querySelector('video');
-                if (!video) return;
-                if (window.__kasetFadeInterval) {
-                    clearInterval(window.__kasetFadeInterval);
-                    window.__kasetFadeInterval = null;
+                if (window.__kasetAudio) {
+                    window.__kasetAudio.fadeRamp(0.0, \(target), \(durationMs), \(isLogarithmic), null);
+                } else {
+                    const video = document.querySelector('video');
+                    if (video) video.volume = \(target);
                 }
-                video.volume = 0.0;
-                const durationMs = \(durationMs);
-                const targetVol = \(target);
-                const startTime = performance.now();
-                window.__kasetFadeInterval = setInterval(() => {
-                    const elapsed = performance.now() - startTime;
-                    const progress = Math.min(1.0, elapsed / durationMs);
-                    const factor = Math.pow(progress, \(exponent));
-                    video.volume = Math.min(targetVol, targetVol * factor);
-                    if (progress >= 1.0) {
-                        clearInterval(window.__kasetFadeInterval);
-                        window.__kasetFadeInterval = null;
-                        video.volume = targetVol;
-                    }
-                }, 16);
             })();
         """
         webView.evaluateJavaScript(script) { _, _ in
@@ -130,47 +95,18 @@ final class AudioFaderService {
     }
 
     /// Cancels any active volume fade timer immediately.
-    func cancelActiveFade() {
-        self.activeTimer?.invalidate()
-        self.activeTimer = nil
-        let callback = self.onComplete
-        self.onComplete = nil
-        callback?()
-    }
-
-    private func performFadeStep(webView: WKWebView?) {
-        self.currentStep += 1
-        let progress = Double(self.currentStep) / Double(self.totalSteps)
-
-        let nextVolume: Double
-        if self.isFadeOut {
-            let factor = Self.calculateFactor(progress: progress, curve: self.curve)
-            nextVolume = max(0.0, self.initialVolume * (1.0 - factor))
-        } else {
-            let factor = Self.calculateFactor(progress: progress, curve: self.curve)
-            nextVolume = min(self.targetVolume, self.targetVolume * factor)
-        }
-
-        let script = "if (document.querySelector('video')) { document.querySelector('video').volume = \(nextVolume); }"
+    func cancelActiveFade(webView: WKWebView? = nil) {
+        let script = "if (window.__kasetAudio) { window.__kasetAudio.cancelFade(); }"
         webView?.evaluateJavaScript(script, completionHandler: nil)
-
-        if self.currentStep >= self.totalSteps {
-            self.activeTimer?.invalidate()
-            self.activeTimer = nil
-            let callback = self.onComplete
-            self.onComplete = nil
-            callback?()
-        }
     }
 
-    private static func calculateFactor(progress: Double, curve: FadeCurve) -> Double {
+    static func calculateFactor(progress: Double, curve: FadeCurve) -> Double {
         let clamped = max(0.0, min(1.0, progress))
         switch curve {
         case .linear:
             return clamped
         case .logarithmic:
-            // Logarithmic volume curve matching human acoustic loudness perception
-            return pow(clamped, 2.0)
+            return pow(clamped, 2.2)
         }
     }
 }

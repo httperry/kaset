@@ -73,31 +73,16 @@ struct MusicSettingsView: View {
                 .help(String(localized: "Choose the preferred audio quality for YouTube Music playback"))
 
                 Toggle(String(localized: "Smooth Audio Fading"), isOn: self.$settings.audioFadingEnabled)
-                    .help(String(localized: "Gradually ramps audio volume on play, pause, and track transitions"))
-
-                if self.settings.audioFadingEnabled {
-                    Slider(
-                        value: self.$settings.audioFadeDuration,
-                        in: 0.3 ... 2.5,
-                        step: 0.1
-                    ) {
-                        Text(String(localized: "Fade Duration"))
-                    } minimumValueLabel: {
-                        Text("0.3s").font(.caption).foregroundStyle(.secondary)
-                    } maximumValueLabel: {
-                        Text(String(format: "%.1fs", self.settings.audioFadeDuration))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
-                    .help(String(localized: "Duration in seconds for smooth audio fade in/out"))
-                }
+                    .help(String(localized: "Gradually ramps audio volume on play, pause, track skipping, and buffering transitions"))
             } header: {
                 Text(String(localized: "Audio"))
             } footer: {
                 if self.settings.audioFadingEnabled {
-                    Text(String(localized: "Equal-power attenuation mimics human ear loudness perception for a natural fade effect."))
+                    Text(String(localized: "Acoustic volume ramps ensure smooth play, pause, and track skip transitions without pops or clicks."))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .multilineTextAlignment(.leading)
                 }
             }
 

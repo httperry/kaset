@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - LiquidGlassFade
+
 /// A reusable edge-docked Liquid Glass gradient surface that dissolves seamlessly into the content.
 ///
 /// Features:

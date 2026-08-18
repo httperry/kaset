@@ -295,10 +295,6 @@ final class SingletonPlayerWebView {
     /// Used to restore polling after full-page navigation.
     var isLyricsPollActive = false
 
-    /// True while a fade-out is in progress. Prevents STATE_UPDATE callbacks
-    /// from re-invoking pause() on every timeupdate tick during the ramp.
-    var isFadeOutInProgress = false
-
     /// Last synced-lyrics line ranges supplied by the visible lyrics panel.
     /// Used by the reload fallback so polling does not restart with an empty range list.
     private var lastLyricsLineRanges: [[String: Int]] = []
@@ -555,12 +551,14 @@ final class SingletonPlayerWebView {
     nonisolated static func pageBootstrapScript(
         isRestoringPlaybackSession: Bool,
         targetVolume: Double,
+        fadingEnabled: Bool = true,
         documentGeneration: UInt64,
         nativePlaybackGeneration: UInt64 = 0
     ) -> String {
         self.pageBootstrapScript(
             shouldAutoplay: !isRestoringPlaybackSession,
             targetVolume: targetVolume,
+            fadingEnabled: fadingEnabled,
             documentGeneration: documentGeneration,
             nativePlaybackGeneration: nativePlaybackGeneration
         )
@@ -569,6 +567,7 @@ final class SingletonPlayerWebView {
     nonisolated static func pageBootstrapScript(
         shouldAutoplay: Bool,
         targetVolume: Double,
+        fadingEnabled: Bool,
         documentGeneration _: UInt64,
         nativePlaybackGeneration: UInt64 = 0
     ) -> String {
@@ -613,6 +612,7 @@ final class SingletonPlayerWebView {
             window.__kasetAutoplayAttempts = 0;
             window.__kasetAutoplayRetryScheduled = false;
             window.__kasetTargetVolume = \(clampedVolume);
+            window.__kasetFadingEnabled = \(fadingEnabled ? "true" : "false");
         """
     }
 
@@ -637,6 +637,7 @@ final class SingletonPlayerWebView {
         nativePlaybackGeneration: UInt64
     ) {
         contentController.removeAllUserScripts()
+        let fadingEnabled = SettingsManager.shared.audioFadingEnabled
 
         // Autoplay intent must exist before media lifecycle events like `canplay`.
         // `didFinish` is too late on fast or cached player loads.
@@ -644,6 +645,7 @@ final class SingletonPlayerWebView {
             source: Self.pageBootstrapScript(
                 shouldAutoplay: shouldAutoplay,
                 targetVolume: targetVolume,
+                fadingEnabled: fadingEnabled,
                 documentGeneration: documentGeneration,
                 nativePlaybackGeneration: nativePlaybackGeneration
             ),
@@ -651,6 +653,13 @@ final class SingletonPlayerWebView {
             forMainFrameOnly: true
         )
         contentController.addUserScript(pageBootstrapScript)
+
+        let audioEngineScript = WKUserScript(
+            source: Self.audioEngineBootstrapScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        contentController.addUserScript(audioEngineScript)
 
         // Keep the page preference in sync before any page script reads localStorage.
         let mediaControlBootstrapScript = WKUserScript(
