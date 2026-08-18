@@ -18,7 +18,7 @@ struct LiquidGlassFade: View {
         if let maxTintOpacity {
             return maxTintOpacity
         }
-        return self.colorScheme == .dark ? 0.50 : 0.30
+        return self.colorScheme == .dark ? 0.65 : 0.25
     }
 
     private var tintColor: Color {
@@ -35,15 +35,18 @@ struct LiquidGlassFade: View {
 
     var body: some View {
         ZStack(alignment: self.edge == .top ? .top : .bottom) {
-            // 1. Pure Liquid Glass layer: full strength at the docked edge, fading smoothly to transparent
+            // 1. Pure Liquid Glass layer: full refraction at docked edge with smooth Ease-Out feathered mask
             Color.clear
                 .compatGlass(interactive: false, in: Rectangle())
                 .mask(
                     LinearGradient(
                         stops: [
                             .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.80), location: 0.45),
-                            .init(color: .white.opacity(0.30), location: 0.75),
+                            .init(color: .white.opacity(0.80), location: 0.15),
+                            .init(color: .white.opacity(0.58), location: 0.35),
+                            .init(color: .white.opacity(0.36), location: 0.55),
+                            .init(color: .white.opacity(0.18), location: 0.75),
+                            .init(color: .white.opacity(0.06), location: 0.90),
                             .init(color: .clear, location: 1.0),
                         ],
                         startPoint: self.startPoint,
@@ -51,11 +54,15 @@ struct LiquidGlassFade: View {
                     )
                 )
 
-            // 2. Color tint layer: 50% transparent near docked edge, fading to 100% transparent (.clear)
+            // 2. Color tint layer: mode-aware tint decaying with smooth Ease-Out feathered falloff
             LinearGradient(
                 stops: [
                     .init(color: self.tintColor.opacity(self.effectiveTintOpacity), location: 0.0),
-                    .init(color: self.tintColor.opacity(self.effectiveTintOpacity * 0.70), location: 0.45),
+                    .init(color: self.tintColor.opacity(self.effectiveTintOpacity * 0.80), location: 0.15),
+                    .init(color: self.tintColor.opacity(self.effectiveTintOpacity * 0.58), location: 0.35),
+                    .init(color: self.tintColor.opacity(self.effectiveTintOpacity * 0.36), location: 0.55),
+                    .init(color: self.tintColor.opacity(self.effectiveTintOpacity * 0.18), location: 0.75),
+                    .init(color: self.tintColor.opacity(self.effectiveTintOpacity * 0.06), location: 0.90),
                     .init(color: .clear, location: 1.0),
                 ],
                 startPoint: self.startPoint,
