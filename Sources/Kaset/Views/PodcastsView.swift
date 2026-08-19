@@ -270,6 +270,7 @@ struct PodcastShowView: View {
     @State private var isSubscribing: Bool = false
     @State private var showAllEpisodes = false
     @State private var subscriptionError: String?
+    @State private var isScrolledPastHeader = false
 
     /// Number of episodes to show in the preview
     private let previewEpisodeCount = 5
@@ -287,11 +288,27 @@ struct PodcastShowView: View {
             }
             .padding(.vertical, 24)
         }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 50
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
+        }
         // Inset resting content while the scroll view stays edge-to-edge so the
         // accent backdrop refracts through the floating glass sidebar.
-        .contentMargins(.horizontal, DetailContentLayout.horizontalInset, for: .scrollContent)
         .accentBackground(from: self.show.thumbnailURL)
-        .navigationTitle(self.show.title)
+        .detailNavigationItem(
+            title: String(localized: "Podcast"),
+            icon: "antenna.radiowaves.left.and.right",
+            scrolledTitle: self.show.title,
+            thumbnailURL: self.show.thumbnailURL,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
+        .toolbarBackgroundVisibility(.hidden, for: .automatic)
+        .liquidGlassFade(edge: .top, height: 64)
         .navigationDestination(for: AllEpisodesDestination.self) { destination in
             AllEpisodesView(
                 show: destination.show,

@@ -3,6 +3,7 @@ import SwiftUI
 /// View displaying an artist's full discography behind an Albums-shelf "See all".
 struct ArtistDiscographyView: View {
     @State var viewModel: ArtistDiscographyViewModel
+    @State private var isScrolledPastHeader = false
 
     var body: some View {
         Group {
@@ -21,9 +22,14 @@ struct ArtistDiscographyView: View {
                 }
             }
         }
-        .navigationTitle(self.viewModel.destination.sectionTitle)
+        .detailNavigationItem(
+            title: String(localized: "Discography"),
+            icon: "opticaldisc",
+            scrolledTitle: self.viewModel.destination.sectionTitle,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
         .toolbarBackgroundVisibility(.hidden, for: .automatic)
-        .topFade()
+        .liquidGlassFade(edge: .top, height: 64)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .error = self.viewModel.loadingState {} else {
                 PlayerBar()
@@ -50,6 +56,15 @@ struct ArtistDiscographyView: View {
                 }
             }
             .padding(24)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 30
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
         }
     }
 

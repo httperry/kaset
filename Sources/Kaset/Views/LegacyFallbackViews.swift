@@ -14,6 +14,7 @@ struct SimplePlaylistDetailView: View {
     let playlist: Playlist
     let playerBarNavigationAction: PlayerBarNavigationAction
     @State var viewModel: PlaylistDetailViewModel
+    @State private var isScrolledPastHeader = false
     @Environment(PlayerService.self) private var playerService
     @Environment(SongLikeStatusManager.self) private var likeStatusManager
 
@@ -49,7 +50,14 @@ struct SimplePlaylistDetailView: View {
                 }
             }
         }
-        .navigationTitle(self.playlist.title)
+        .detailNavigationItem(
+            title: self.playlist.isAlbum ? String(localized: "Album") : String(localized: "Playlist"),
+            icon: self.playlist.isAlbum ? "opticaldisc" : "music.note.list",
+            scrolledTitle: self.viewModel.playlistDetail?.title ?? self.playlist.title,
+            thumbnailURL: self.viewModel.playlistDetail?.thumbnailURL ?? self.playlist.thumbnailURL,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
+        .liquidGlassFade(edge: .top, height: 64)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .error = self.viewModel.loadingState {
             } else {
@@ -84,6 +92,15 @@ struct SimplePlaylistDetailView: View {
             .padding(.horizontal, 20)
             .padding(.top, 20)
             .padding(.bottom, 100)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 50
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
         }
     }
 

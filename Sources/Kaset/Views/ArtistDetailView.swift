@@ -7,6 +7,7 @@ struct ArtistDetailView: View { // swiftlint:disable:this type_body_length
     let artist: Artist
     var playerBarNavigationAction: PlayerBarNavigationAction = .disabled
     @State var viewModel: ArtistDetailViewModel
+    @State private var isScrolledPastHeader = false
     @Environment(PlayerService.self) private var playerService
     @Environment(AuthService.self) private var authService
     @Environment(FavoritesManager.self) private var favoritesManager
@@ -42,8 +43,15 @@ struct ArtistDetailView: View { // swiftlint:disable:this type_body_length
             }
         }
         .accentBackground(from: self.viewModel.artistDetail?.thumbnailURL?.highQualityThumbnailURL)
-        .navigationTitle(self.artist.name)
+        .detailNavigationItem(
+            title: String(localized: "Artist"),
+            icon: "person.fill",
+            scrolledTitle: self.viewModel.artistDetail?.name ?? self.artist.name,
+            thumbnailURL: self.viewModel.artistDetail?.thumbnailURL ?? self.artist.thumbnailURL,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
         .toolbarBackgroundVisibility(.hidden, for: .automatic)
+        .liquidGlassFade(edge: .top, height: 64)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .error = self.viewModel.loadingState {} else {
                 PlayerBar()
@@ -128,11 +136,19 @@ struct ArtistDetailView: View { // swiftlint:disable:this type_body_length
             }
             .padding(.vertical, 24)
         }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 50
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
+        }
         // The ScrollView stays edge-to-edge: non-scrolling content is inset via
         // padding above, while horizontal shelves pass `contentInset` so their
         // tracks reach the under-sidebar band and slide under the floating glass
         // on macOS 26. The accent backdrop (ignores safe area) refracts through.
-        .topFade(style: .contentMask)
     }
 
     private func headerView(_ detail: ArtistDetail) -> some View {

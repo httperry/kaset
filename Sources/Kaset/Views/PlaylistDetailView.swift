@@ -29,6 +29,8 @@ struct PlaylistDetailView: View {
     @State private var isRefining: Bool = false
     /// Error message from refine operation.
     @State private var refineError: String?
+    /// Whether the playlist header is scrolled out of view.
+    @State private var isScrolledPastHeader = false
     /// Computed property to check if playlist is in library.
     var isInLibrary: Bool {
         if self.playlist.isAlbum {
@@ -85,8 +87,15 @@ struct PlaylistDetailView: View {
         .accentBackground(
             from: self.viewModel.playlistDetail?.thumbnailURL?.highQualityThumbnailURL
         )
-        .navigationTitle(self.playlist.title)
+        .detailNavigationItem(
+            title: self.playlist.isAlbum ? String(localized: "Album") : String(localized: "Playlist"),
+            icon: self.playlist.isAlbum ? "opticaldisc" : "music.note.list",
+            scrolledTitle: self.viewModel.playlistDetail?.title ?? self.playlist.title,
+            thumbnailURL: self.viewModel.playlistDetail?.thumbnailURL ?? self.playlist.thumbnailURL,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
         .toolbarBackgroundVisibility(.hidden, for: .automatic)
+        .liquidGlassFade(edge: .top, height: 64)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .error = self.viewModel.loadingState {
             } else {
@@ -155,11 +164,19 @@ struct PlaylistDetailView: View {
             }
             .padding(.vertical, 24)
         }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 50
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
+        }
         // Inset the resting content while the scroll view stays edge-to-edge so
         // content extends under the floating glass sidebar; the accent backdrop
         // (which ignores the safe area) refracts through it.
         .contentMargins(.horizontal, DetailContentLayout.horizontalInset, for: .scrollContent)
-        .topFade(style: .contentMask)
     }
 
     private func headerView(_ detail: PlaylistDetail) -> some View {

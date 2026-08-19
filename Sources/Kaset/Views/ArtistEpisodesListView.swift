@@ -5,6 +5,7 @@ import SwiftUI
 /// performances, etc.
 struct ArtistEpisodesListView: View {
     @State var viewModel: ArtistEpisodesListViewModel
+    @State private var isScrolledPastHeader = false
     @Environment(PlayerService.self) private var playerService
 
     var body: some View {
@@ -29,9 +30,14 @@ struct ArtistEpisodesListView: View {
                 }
             }
         }
-        .navigationTitle(self.viewModel.destination.sectionTitle)
+        .detailNavigationItem(
+            title: String(localized: "Episodes"),
+            icon: "mic.fill",
+            scrolledTitle: self.viewModel.destination.sectionTitle,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
         .toolbarBackgroundVisibility(.hidden, for: .automatic)
-        .topFade()
+        .liquidGlassFade(edge: .top, height: 64)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .error = self.viewModel.loadingState {} else {
                 PlayerBar()
@@ -53,6 +59,15 @@ struct ArtistEpisodesListView: View {
                 }
             }
             .padding(.vertical, 16)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 30
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
         }
         // Edge-to-edge with a resting inset so the list extends under the
         // floating glass sidebar.

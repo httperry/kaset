@@ -3,6 +3,7 @@ import SwiftUI
 /// A YouTube channel page: header plus the landing-tab video grid.
 struct YouTubeChannelView: View {
     @State private var viewModel: YouTubeChannelViewModel
+    @State private var isScrolledPastHeader = false
 
     private static let columns = [
         GridItem(.adaptive(minimum: 210, maximum: 320), spacing: 16),
@@ -35,7 +36,15 @@ struct YouTubeChannelView: View {
                 }
             }
         }
-        .navigationTitle(Text(self.viewModel.detail?.channel.name ?? ""))
+        .detailNavigationItem(
+            title: String(localized: "Channel"),
+            icon: "person.crop.square.fill",
+            scrolledTitle: self.viewModel.detail?.channel.name,
+            thumbnailURL: self.viewModel.detail?.channel.thumbnailURL,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
+        .toolbarBackgroundVisibility(.hidden, for: .automatic)
+        .liquidGlassFade(edge: .top, height: 64)
         .task {
             await self.viewModel.load()
         }
@@ -62,6 +71,15 @@ struct YouTubeChannelView: View {
                 }
             }
             .padding(.vertical, 20)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 40
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
         }
         // Edge-to-edge with a resting inset so content extends under the
         // floating glass sidebar.

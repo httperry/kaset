@@ -8,6 +8,7 @@ import SwiftUI
 /// to leverage the parent's navigation context.
 struct MoodCategoryDetailView: View {
     @State var viewModel: MoodCategoryViewModel
+    @State private var isScrolledPastHeader = false
     @Environment(PlayerService.self) private var playerService
 
     var body: some View {
@@ -23,7 +24,14 @@ struct MoodCategoryDetailView: View {
                 }
             }
         }
-        .navigationTitle(self.viewModel.category.title)
+        .detailNavigationItem(
+            title: self.viewModel.category.title,
+            icon: "sparkles",
+            scrolledTitle: self.viewModel.category.title,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
+        .toolbarBackgroundVisibility(.hidden, for: .automatic)
+        .liquidGlassFade(edge: .top, height: 64)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .error = self.viewModel.loadingState {} else {
                 PlayerBar()
@@ -61,6 +69,15 @@ struct MoodCategoryDetailView: View {
                 // Edge-to-edge so shelves slide under the glass sidebar;
                 // resting inset is restored per-shelf via contentInset.
                 .padding(.vertical, 20)
+            }
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentOffset.y > 30
+            } action: { _, isScrolled in
+                if self.isScrolledPastHeader != isScrolled {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        self.isScrolledPastHeader = isScrolled
+                    }
+                }
             }
         }
     }

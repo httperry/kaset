@@ -3,6 +3,7 @@ import SwiftUI
 /// A YouTube playlist page: header plus its video rows.
 struct YouTubePlaylistDetailView: View {
     @State private var viewModel: YouTubePlaylistViewModel
+    @State private var isScrolledPastHeader = false
 
     private static let columns = [
         GridItem(.adaptive(minimum: 210, maximum: 320), spacing: 16),
@@ -35,7 +36,15 @@ struct YouTubePlaylistDetailView: View {
                 }
             }
         }
-        .navigationTitle(Text(self.viewModel.detail?.playlist.title ?? ""))
+        .detailNavigationItem(
+            title: String(localized: "Playlist"),
+            icon: "play.rectangle.on.rectangle.fill",
+            scrolledTitle: self.viewModel.detail?.playlist.title,
+            thumbnailURL: self.viewModel.detail?.playlist.thumbnailURL,
+            isScrolledPastHeader: self.isScrolledPastHeader
+        )
+        .toolbarBackgroundVisibility(.hidden, for: .automatic)
+        .liquidGlassFade(edge: .top, height: 64)
         .task {
             await self.viewModel.load()
         }
@@ -74,6 +83,15 @@ struct YouTubePlaylistDetailView: View {
                 }
             }
             .padding(.vertical, 20)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y > 50
+        } action: { _, isScrolled in
+            if self.isScrolledPastHeader != isScrolled {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    self.isScrolledPastHeader = isScrolled
+                }
+            }
         }
         // Edge-to-edge with a resting inset so content extends under the
         // floating glass sidebar.
