@@ -86,6 +86,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     /// Fullscreen presentation state.
     @State private var isFullScreen = false
 
+    /// Coordinator for detail navigation stack, back buttons, and topbar pills.
+    @State private var detailNavigationManager = DetailNavigationManager()
+
     init(
         navigationSelection: Binding<NavigationItem?>,
         youtubeNavigationSelection: Binding<YouTubeNavigationItem?>,
@@ -325,6 +328,15 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
                     VideoWindowController.shared.close()
                 }
             }
+            .onChange(of: self.navigationSelection) { _, _ in
+                self.detailNavigationManager.clear()
+            }
+            .onChange(of: self.selectedSidebarPinnedItem) { _, _ in
+                self.detailNavigationManager.clear()
+            }
+            .onChange(of: self.youtubeNavigationSelection) { _, _ in
+                self.detailNavigationManager.clear()
+            }
     }
 
     private var accountLifecycleContent: some View {
@@ -539,6 +551,7 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         }
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showLyrics)
         .animation(.easeInOut(duration: 0.25), value: self.playerService.showQueue)
+        .environment(self.detailNavigationManager)
         .frame(minWidth: MainWindowLayout.minimumWidth, minHeight: MainWindowLayout.minimumHeight)
         .toolbar(removing: .sidebarToggle)
         // Native SwiftUI toolbar — these items render inside the macOS titlebar in windowed mode.
@@ -546,45 +559,58 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
                 if !self.isFullScreen {
-                    // Sidebar Toggle
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if self.columnVisibility == .all {
-                                self.columnVisibility = .detailOnly
-                            } else {
-                                self.columnVisibility = .all
+                    HStack(spacing: 8) {
+                        if self.detailNavigationManager.canGoBack {
+                            Button {
+                                self.detailNavigationManager.goBack()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .compatGlass(interactive: true, in: .capsule)
+                            .keyboardShortcut("[", modifiers: .command)
+                            .help(String(localized: "Back (⌘[)"))
+                            .accessibilityIdentifier("MainWindow.backButton")
+                            .transition(.asymmetric(
+                                insertion: .scale.combined(with: .opacity),
+                                removal: .scale.combined(with: .opacity)
+                            ))
                         }
-                    } label: {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 32, height: 32)
-                            .contentShape(Rectangle())
+
+                        // Sidebar Toggle
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if self.columnVisibility == .all {
+                                    self.columnVisibility = .detailOnly
+                                } else {
+                                    self.columnVisibility = .all
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "sidebar.left")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .compatGlass(interactive: true, in: .capsule)
+                        .help(String(localized: "Toggle Sidebar"))
+                        .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
                     }
-                    .buttonStyle(.plain)
-                    .compatGlass(interactive: true, in: .capsule)
                     .padding(.top, 4)
-                    .help(String(localized: "Toggle Sidebar"))
-                    .accessibilityIdentifier(AccessibilityID.Sidebar.toggleButton)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: self.detailNavigationManager.canGoBack)
                 }
             }
 
             ToolbarItem(placement: .principal) {
                 if !self.isFullScreen {
-                    // Centered Location Pill — replaces default navigation title text in titlebar
-                    HStack(spacing: 6) {
-                        Image(systemName: self.currentNavigationIcon)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(PackageResourceLookup.brandAccent)
-                        Text(self.currentNavigationTitle)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.primary)
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(height: 32)
-                    .compatGlass(interactive: false, in: .capsule)
-                    .padding(.top, 4)
+                    self.locationPillView
+                        .padding(.top, 4)
                 }
             }
 
@@ -610,6 +636,54 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
     }
 
+    private var locationPillView: some View {
+        let detail = self.detailNavigationManager.current
+        let isScrolled = detail?.isScrolledPastHeader == true && (detail?.scrolledTitle != nil || detail?.thumbnailURL != nil)
+
+        return HStack(spacing: 6) {
+            if isScrolled, let detail {
+                if let thumbnailURL = detail.thumbnailURL {
+                    CachedAsyncImage(
+                        url: thumbnailURL,
+                        targetSize: CGSize(width: 20, height: 20)
+                    ) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Image(systemName: detail.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(PackageResourceLookup.brandAccent)
+                    }
+                    .frame(width: 20, height: 20)
+                    .clipShape(.rect(cornerRadius: 4))
+                } else {
+                    Image(systemName: detail.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(PackageResourceLookup.brandAccent)
+                }
+
+                TopBarMarqueeText(
+                    title: detail.scrolledTitle ?? detail.title,
+                    maxWidth: 200
+                )
+            } else {
+                Image(systemName: self.currentNavigationIcon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(PackageResourceLookup.brandAccent)
+
+                Text(self.currentNavigationTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 32)
+        .compatGlass(interactive: false, in: .capsule)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isScrolled)
+    }
+
     private var topBarBackground: some View {
         ZStack(alignment: .top) {
             // Window drag handle in empty regions for native window movement & double-click zoom
@@ -627,20 +701,27 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     private var topBarView: some View {
         ZStack {
             // Centered Location Pill
-            HStack(spacing: 6) {
-                Image(systemName: self.currentNavigationIcon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(PackageResourceLookup.brandAccent)
-                Text(self.currentNavigationTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 32)
-            .compatGlass(interactive: false, in: .capsule)
+            self.locationPillView
 
             // Leading and Trailing controls
-            HStack {
+            HStack(spacing: 8) {
+                if self.detailNavigationManager.canGoBack {
+                    Button {
+                        self.detailNavigationManager.goBack()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .compatGlass(interactive: true, in: .capsule)
+                    .keyboardShortcut("[", modifiers: .command)
+                    .help(String(localized: "Back (⌘[)"))
+                    .accessibilityIdentifier("MainWindow.backButton")
+                }
+
                 // Sidebar Toggle
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -689,6 +770,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     }
 
     private var currentNavigationTitle: String {
+        if let detail = self.detailNavigationManager.current {
+            return detail.title
+        }
         if self.settings.appSource == .music {
             if let selectedSidebarPinnedItem {
                 return selectedSidebarPinnedItem.title
@@ -700,6 +784,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
     }
 
     private var currentNavigationIcon: String {
+        if let detail = self.detailNavigationManager.current {
+            return detail.icon
+        }
         if self.settings.appSource == .music {
             if let selectedSidebarPinnedItem {
                 return selectedSidebarPinnedItem.systemImage
