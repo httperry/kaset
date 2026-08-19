@@ -37,18 +37,18 @@ struct LiquidGlassFade: View {
 
     var body: some View {
         ZStack(alignment: self.edge == .top ? .top : .bottom) {
-            // 1. Pure Liquid Glass layer: full refraction at docked edge with smooth Ease-Out feathered mask
-            Color.clear
+            // 1. Pure Liquid Glass refraction / Material layer with smooth feathered mask
+            Rectangle()
+                .fill(.clear)
                 .compatGlass(interactive: false, in: Rectangle())
                 .mask(
                     LinearGradient(
                         stops: [
                             .init(color: .white, location: 0.0),
-                            .init(color: .white.opacity(0.80), location: 0.15),
-                            .init(color: .white.opacity(0.58), location: 0.35),
-                            .init(color: .white.opacity(0.36), location: 0.55),
-                            .init(color: .white.opacity(0.18), location: 0.75),
-                            .init(color: .white.opacity(0.06), location: 0.90),
+                            .init(color: .white.opacity(0.85), location: 0.20),
+                            .init(color: .white.opacity(0.60), location: 0.45),
+                            .init(color: .white.opacity(0.35), location: 0.65),
+                            .init(color: .white.opacity(0.15), location: 0.85),
                             .init(color: .clear, location: 1.0),
                         ],
                         startPoint: self.startPoint,
