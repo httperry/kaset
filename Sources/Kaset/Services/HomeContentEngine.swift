@@ -54,84 +54,104 @@ enum HomeContentEngine {
 
     // MARK: - Hero Selection
 
-    /// Selects or synthesizes the top featured Hero banner item.
+    /// Selects or synthesizes the top featured Hero banner item using behavioral affinity, time-of-day context, and anti-habituation.
     static func selectHeroItem(
         from sections: [HomeSection],
         affinityEngine: UserAffinityEngine
     ) -> HomeHeroItemPayload? {
-        // Priority 1: Check for "Your Supermix" or "My Mix" in raw sections
+        struct ScoredHeroCandidate {
+            let item: HomeSectionItem
+            let score: Double
+            let badgeText: String
+            let isSupermix: Bool
+        }
+
+        var candidates: [ScoredHeroCandidate] = []
+
+        // 1. Check for "Your Supermix" or "My Mix" in raw sections
         for section in sections {
             for item in section.items {
                 let lowerTitle = item.title.lowercased()
                 if lowerTitle.contains("supermix") || lowerTitle.contains("my mix") {
-                    let artists = Self.extractTopArtistsSummary(from: section.items)
-                    return HomeHeroItemPayload(
-                        id: item.id,
-                        title: item.title,
-                        artistSubtitle: artists.isEmpty ? (item.subtitle ?? "Personalized Mix") : artists,
-                        editorialDescription: "An endless personalized mix combining your favorite daily tracks with fresh new discoveries.",
-                        thumbnailURL: item.thumbnailURL,
+                    candidates.append(ScoredHeroCandidate(
+                        item: item,
+                        score: 180.0,
                         badgeText: "SUPERMIX",
-                        playTarget: Self.makePlayTarget(from: item)
-                    )
+                        isSupermix: true
+                    ))
                 }
             }
         }
 
-        // Priority 2: Highest frequency/affinity scored item from user taste profile
+        // 2. Score all valid items across sections
         let allItems = sections.flatMap(\.items)
-        let scoredCandidates = allItems.map { item -> (item: HomeSectionItem, score: Int) in
+        for item in allItems {
             let score = affinityEngine.computeAffinityScore(
                 videoId: item.videoId,
                 artist: item.subtitle,
                 albumId: item.album?.id
             )
-            return (item, score)
+            // Negative score means disliked/suppressed
+            guard score >= 0 else { continue }
+
+            let badge = if score >= 40.0 {
+                "HEAVY ROTATION"
+            } else if item.album != nil {
+                "FEATURED ALBUM"
+            } else {
+                "FOR YOU"
+            }
+
+            candidates.append(ScoredHeroCandidate(
+                item: item,
+                score: score,
+                badgeText: badge,
+                isSupermix: false
+            ))
         }
 
-        if let topScored = scoredCandidates.filter({ $0.score >= 20 }).max(by: { $0.score < $1.score }) {
-            let item = topScored.item
-            return HomeHeroItemPayload(
-                id: item.id,
-                title: item.title,
-                artistSubtitle: item.subtitle ?? "Heavy Rotation",
-                editorialDescription: "Your top frequent rotation and personalized recommendations.",
-                thumbnailURL: item.thumbnailURL,
-                badgeText: "HEAVY ROTATION",
-                playTarget: Self.makePlayTarget(from: item)
-            )
+        guard !candidates.isEmpty else { return nil }
+
+        // Deduplicate candidates by item ID
+        var seenIDs = Set<String>()
+        var uniqueCandidates = candidates.filter { seenIDs.insert($0.item.id).inserted }
+
+        // Sort descending by score
+        uniqueCandidates.sort { $0.score > $1.score }
+
+        // Take top 5 elite pool
+        var elitePool = Array(uniqueCandidates.prefix(5))
+
+        // Anti-Habituation: If top candidate was shown on the previous refresh and alternatives exist, rotate
+        if let lastHeroID = affinityEngine.profile.lastHeroItemID,
+           elitePool.count > 1,
+           elitePool.first?.item.id == lastHeroID
+        {
+            let previous = elitePool.removeFirst()
+            elitePool.append(previous) // Move to back of elite pool
         }
 
-        // Priority 3: Top item from "Listen again" or "Quick picks"
-        if let firstSection = sections.first(where: {
-            let lower = $0.title.lowercased()
-            return lower.contains("listen again") || lower.contains("quick picks") || lower.contains("favourites")
-        }), let firstItem = firstSection.items.first {
-            return HomeHeroItemPayload(
-                id: firstItem.id,
-                title: firstItem.title,
-                artistSubtitle: firstItem.subtitle ?? "Featured",
-                editorialDescription: "Jump back into your recent rotation with curated recommendations.",
-                thumbnailURL: firstItem.thumbnailURL,
-                badgeText: "HEAVY ROTATION",
-                playTarget: Self.makePlayTarget(from: firstItem)
-            )
-        }
+        let selectedCandidate = elitePool.first ?? uniqueCandidates[0]
+        let selectedItem = selectedCandidate.item
 
-        // Priority 4: First available item
-        if let firstItem = sections.first?.items.first {
-            return HomeHeroItemPayload(
-                id: firstItem.id,
-                title: firstItem.title,
-                artistSubtitle: firstItem.subtitle ?? "Featured",
-                editorialDescription: "Discover music tailored for you today.",
-                thumbnailURL: firstItem.thumbnailURL,
-                badgeText: nil,
-                playTarget: Self.makePlayTarget(from: firstItem)
-            )
-        }
+        // Record chosen hero for anti-habituation on next refresh
+        affinityEngine.recordHeroShown(itemId: selectedItem.id)
 
-        return nil
+        let artistSummary = Self.extractTopArtistsSummary(from: [selectedItem])
+        let editorialDesc = affinityEngine.generateHeroEditorialDescription(
+            title: selectedItem.title,
+            artistSummary: artistSummary.isEmpty ? (selectedItem.subtitle ?? "") : artistSummary
+        )
+
+        return HomeHeroItemPayload(
+            id: selectedItem.id,
+            title: selectedItem.title,
+            artistSubtitle: selectedItem.subtitle ?? "Personalized Selection",
+            editorialDescription: editorialDesc,
+            thumbnailURL: selectedItem.thumbnailURL,
+            badgeText: selectedCandidate.badgeText,
+            playTarget: Self.makePlayTarget(from: selectedItem)
+        )
     }
 
     // MARK: - Jump Back In Selection
@@ -156,9 +176,13 @@ enum HomeContentEngine {
             candidateItems = sections.flatMap(\.items)
         }
 
-        // Deduplicate candidates by ID
+        // Filter out disliked items and deduplicate candidates by ID
         var seenIDs = Set<String>()
-        var uniqueCandidates = candidateItems.filter { seenIDs.insert($0.id).inserted }
+        var uniqueCandidates = candidateItems.filter { item in
+            let score = affinityEngine.computeAffinityScore(videoId: item.videoId, artist: item.subtitle, albumId: item.album?.id)
+            guard score >= 0 else { return false } // Dislike suppression
+            return seenIDs.insert(item.id).inserted
+        }
 
         guard !uniqueCandidates.isEmpty else { return nil }
 
@@ -175,8 +199,8 @@ enum HomeContentEngine {
             return lhsRecentIndex < rhsRecentIndex
         }
 
-        // Find best primary candidate (prefer an album or playlist over an isolated song)
-        let primaryItem = uniqueCandidates.first { item in
+        // Find primary candidate (prefer an album or playlist over an isolated song)
+        var albumPlaylistCandidates = uniqueCandidates.filter { item in
             if case .album = item {
                 return true
             }
@@ -184,16 +208,41 @@ enum HomeContentEngine {
                 return true
             }
             return false
-        } ?? uniqueCandidates[0]
+        }
 
-        // Secondary items: next 4 distinct items excluding the primary
-        let secondaryItems = uniqueCandidates
-            .filter { $0.id != primaryItem.id }
-            .prefix(4)
+        // Anti-habituation for Bento primary item
+        if let lastPrimaryID = affinityEngine.profile.lastBentoPrimaryID,
+           albumPlaylistCandidates.count > 1,
+           albumPlaylistCandidates.first?.id == lastPrimaryID
+        {
+            let previous = albumPlaylistCandidates.removeFirst()
+            albumPlaylistCandidates.append(previous)
+        }
+
+        let primaryItem = albumPlaylistCandidates.first ?? uniqueCandidates[0]
+        affinityEngine.recordBentoPrimaryShown(itemId: primaryItem.id)
+
+        // Secondary items: next 4 distinct items with diversity constraint (no more than 2 from same artist)
+        var secondaryItems: [HomeSectionItem] = []
+        var artistCountInPills: [String: Int] = [:]
+
+        for item in uniqueCandidates where item.id != primaryItem.id {
+            let artistKey = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let currentCount = artistCountInPills[artistKey, default: 0]
+            if currentCount < 2 || artistKey.isEmpty {
+                secondaryItems.append(item)
+                if !artistKey.isEmpty {
+                    artistCountInPills[artistKey] = currentCount + 1
+                }
+            }
+            if secondaryItems.count == 4 {
+                break
+            }
+        }
 
         return HomeBentoItemPayload(
             primaryItem: primaryItem,
-            secondaryItems: Array(secondaryItems)
+            secondaryItems: secondaryItems
         )
     }
 

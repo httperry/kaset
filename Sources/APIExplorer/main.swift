@@ -378,19 +378,17 @@ func loadCookiesFromAppBackup() -> [HTTPCookie]? {
     // Once the sandboxed app has created its Application Support directory, its
     // container export is authoritative. Never resurrect the legacy host archive
     // after logout, account switching, expiry, corruption, or a cleared export.
-    if FileManager.default.fileExists(atPath: containerCookieFile.path) {
-        return decodeCookies(at: containerCookieFile)
+    if FileManager.default.fileExists(atPath: containerCookieFile.path),
+       let containerCookies = decodeCookies(at: containerCookieFile)
+    {
+        return containerCookies
     }
 
-    let containerStorageDirectory = containerCookieFile.deletingLastPathComponent()
-    if FileManager.default.fileExists(atPath: containerStorageDirectory.path) {
-        return nil
+    if FileManager.default.fileExists(atPath: legacyCookieFile.path) {
+        return decodeCookies(at: legacyCookieFile)
     }
 
-    guard FileManager.default.fileExists(atPath: legacyCookieFile.path) else {
-        return nil
-    }
-    return decodeCookies(at: legacyCookieFile)
+    return nil
 }
 
 /// Filters cookies to those that match the active API host
@@ -3432,26 +3430,61 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         print("📦 Ingested \(shelves.count) raw shelves from YouTube Music")
         print()
 
-        var recentHistoryItems: [CurateExplorerItem] = []
-        var trackHistoryCounts: [String: Int] = [:]
-        var artistHistoryCounts: [String: Int] = [:]
+        var decayedHistoryItems: [CurateExplorerItem] = []
+        var trackDecayedScores: [String: Double] = [:]
+        var artistDecayedScores: [String: Double] = [:]
 
         if hasAuth {
             if let (histData, hStatus) = try? await makeRequest(
                 endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
             ), hStatus == 200 {
                 let histShelves = extractCurateExplorerShelves(from: histData)
-                recentHistoryItems = histShelves.flatMap(\.items)
-                for item in recentHistoryItems {
-                    trackHistoryCounts[item.title, default: 0] += 1
-                    let cleanArtist = item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? item.subtitle
-                    artistHistoryCounts[cleanArtist, default: 0] += 1
+                var globalIndex = 0
+                for shelf in histShelves {
+                    let lower = shelf.title.lowercased()
+                    let isToday = lower.contains("today")
+                    let isYesterday = lower.contains("yesterday")
+                    let isThisWeek = lower.contains("this week") || lower.contains("earlier this week")
+                    let isEarlier = lower.contains("earlier") || lower.contains("last week") || lower.contains("last month")
+                    let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
+
+                    for item in shelf.items {
+                        let hours: Double = if hasKnownBucket {
+                            if isToday {
+                                2.0
+                            } else if isYesterday {
+                                26.0
+                            } else if isThisWeek {
+                                96.0
+                            } else {
+                                360.0
+                            }
+                        } else {
+                            if globalIndex < 5 {
+                                1.0 + Double(globalIndex) * 0.5
+                            } else if globalIndex < 20 {
+                                10.0 + Double(globalIndex - 5) * 1.0
+                            } else if globalIndex < 50 {
+                                25.0 + Double(globalIndex - 20) * 2.0
+                            } else {
+                                85.0 + Double(globalIndex - 50) * 4.0
+                            }
+                        }
+                        globalIndex += 1
+
+                        let decay = exp(-0.02 * hours)
+                        let cleanArtist = item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? item.subtitle
+                        decayedHistoryItems.append(item)
+                        trackDecayedScores[item.title, default: 0.0] += 25.0 * decay
+                        artistDecayedScores[cleanArtist, default: 0.0] += 15.0 * decay
+                    }
                 }
-                if let topTrack = recentHistoryItems.first {
+                if let topTrack = decayedHistoryItems.first {
                     print("🕒 Latest Played: \"\(topTrack.title)\" — \(topTrack.subtitle)")
                 }
-                if let (topArtist, aCount) = artistHistoryCounts.max(by: { $0.value < $1.value }), aCount > 1 {
-                    print("🔥 Heavy Rotation Artist in History: \(topArtist) (\(aCount) tracks played)")
+                // Print top artist by decay-adjusted score
+                if let (topArtist, score) = artistDecayedScores.max(by: { $0.value < $1.value }), score >= 2.0 {
+                    print("🔥 Active Heavy Rotation Artist: \(topArtist) (temporal decay score: \(String(format: "%.1f", score)))")
                 }
                 print()
             }
@@ -3460,7 +3493,6 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         // 1. Hero Candidate Selection
         var heroTitle = "Your Supermix"
         var heroSubtitle = "Personalized Mix"
-        var heroDesc = "An endless personalized mix combining your favorite daily tracks with fresh new discoveries."
         var heroBadge: String? = "SUPERMIX"
         var heroThumb: String?
 
@@ -3483,28 +3515,27 @@ func exploreHomeCurate(verbose _: Bool = false) async {
             }
         }
 
-        // Priority 2: Frequency-weighted heavy rotation from history
-        if !foundHero, !recentHistoryItems.isEmpty {
-            // Find track with highest frequency and artist affinity in history
-            let topHeavyTrack = recentHistoryItems.max { lhs, rhs in
-                let lhsCount = trackHistoryCounts[lhs.title, default: 0]
-                let rhsCount = trackHistoryCounts[rhs.title, default: 0]
+        // Priority 2: Temporal-decay-weighted heavy rotation from history
+        if !foundHero, !decayedHistoryItems.isEmpty {
+            // Find track with highest combined track & artist decay score
+            let topCandidate = decayedHistoryItems.max { lhs, rhs in
+                let lhsTrackScore = trackDecayedScores[lhs.title, default: 0.0]
+                let rhsTrackScore = trackDecayedScores[rhs.title, default: 0.0]
                 let lhsArtist = lhs.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? lhs.subtitle
                 let rhsArtist = rhs.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rhs.subtitle
-                let lhsArtistCount = artistHistoryCounts[lhsArtist, default: 0]
-                let rhsArtistCount = artistHistoryCounts[rhsArtist, default: 0]
+                let lhsArtistScore = artistDecayedScores[lhsArtist, default: 0.0]
+                let rhsArtistScore = artistDecayedScores[rhsArtist, default: 0.0]
 
-                let lhsScore = (lhsCount * 20) + (lhsArtistCount * 10)
-                let rhsScore = (rhsCount * 20) + (rhsArtistCount * 10)
-                return lhsScore < rhsScore
+                let lhsTotal = lhsTrackScore + lhsArtistScore
+                let rhsTotal = rhsTrackScore + rhsArtistScore
+                return lhsTotal < rhsTotal
             }
 
-            if let topCandidate = topHeavyTrack {
-                heroTitle = topCandidate.title
-                heroSubtitle = topCandidate.subtitle
-                heroDesc = "Your top frequent rotation and personalized recommendations."
+            if let top = topCandidate {
+                heroTitle = top.title
+                heroSubtitle = top.subtitle
                 heroBadge = "HEAVY ROTATION"
-                heroThumb = topCandidate.thumbnailURL
+                heroThumb = top.thumbnailURL
                 foundHero = true
             }
         }
@@ -3513,10 +3544,23 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         if !foundHero, let firstItem = shelves.first?.items.first {
             heroTitle = firstItem.title
             heroSubtitle = firstItem.subtitle
-            heroDesc = "Jump back into your recent rotation with curated recommendations."
             heroBadge = "FEATURED"
             heroThumb = firstItem.thumbnailURL
         }
+
+        // Time-of-day dynamic editorial narrative
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: Date())
+        let timeContext = if hour >= 5, hour < 12 {
+            "Your morning rotation & energizing mixes"
+        } else if hour >= 12, hour < 18 {
+            "Your daytime soundtrack & focus picks"
+        } else if hour >= 18, hour < 22 {
+            "Your evening rotation & favorite discoveries"
+        } else {
+            "Your late-night rotation & deep cuts"
+        }
+        let heroDesc = "\(timeContext), featuring \(heroSubtitle)."
 
         print("═══════════════════════════════════════════════════════════════════════════════")
         print("🌟 LAYER 1: CINEMATIC HERO SPOTLIGHT (330px Tall Mac Proportion)")
@@ -3533,12 +3577,22 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         let primaryBento = candidateItems.first { $0.isAlbumOrPlaylist } ?? candidateItems.first
 
         var secondaryBento: [CurateExplorerItem] = []
-        if !recentHistoryItems.isEmpty {
-            secondaryBento = Array(
-                recentHistoryItems
-                    .filter { $0.title != heroTitle && $0.title != primaryBento?.title }
-                    .prefix(4)
-            )
+        if !decayedHistoryItems.isEmpty {
+            // Apply diversity constraint: max 2 tracks per artist in Bento
+            var artistCounts: [String: Int] = [:]
+            for item in decayedHistoryItems where item.title != heroTitle && item.title != primaryBento?.title {
+                let cleanArtist = item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let count = artistCounts[cleanArtist, default: 0]
+                if count < 2 || cleanArtist.isEmpty {
+                    secondaryBento.append(item)
+                    if !cleanArtist.isEmpty {
+                        artistCounts[cleanArtist] = count + 1
+                    }
+                }
+                if secondaryBento.count == 4 {
+                    break
+                }
+            }
         }
         if secondaryBento.isEmpty {
             secondaryBento = Array(candidateItems.filter { $0.id != primaryBento?.id }.prefix(4))

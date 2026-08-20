@@ -121,4 +121,58 @@ struct HomeContentEngineTests {
         #expect(provisioned.curatedShelves.count == 1)
         #expect(provisioned.curatedShelves.first?.title == "Quick picks")
     }
+
+    @Test("Anti-habituation rotates Hero selection when multiple elite candidates exist")
+    func antiHabituationHeroRotation() {
+        let affinityEngine = UserAffinityEngine(skipPersistence: true)
+
+        let supermix = TestFixtures.makePlaylist(id: "supermix-1", title: "Your Supermix")
+        let supermixSection = HomeSection(id: "sec-mix", title: "Mixed for you", items: [.playlist(supermix)])
+
+        let heavySong = TestFixtures.makeSong(id: "heavy-1", title: "90210", artistName: "Travis Scott")
+        let heavySection = HomeSection(id: "sec-heavy", title: "Listen again", items: [.song(heavySong)])
+
+        // First selection: picks supermix and marks it shown
+        let run1 = HomeContentEngine.process(
+            rawSections: [supermixSection, heavySection],
+            affinityEngine: affinityEngine
+        )
+        #expect(run1.heroItem?.id == "playlist-supermix-1")
+
+        // Second selection: supermix was just shown, so anti-habituation rotates to next elite candidate
+        let run2 = HomeContentEngine.process(
+            rawSections: [supermixSection, heavySection],
+            affinityEngine: affinityEngine
+        )
+        #expect(run2.heroItem?.id == "song-heavy-1")
+    }
+
+    @Test("Bento enforces artist diversity across secondary pills")
+    func bentoEnforcesArtistDiversity() {
+        let affinityEngine = UserAffinityEngine(skipPersistence: true)
+
+        let album = TestFixtures.makeAlbum(id: "alb-main", title: "Main Album", artistName: "Primary Artist")
+
+        // 4 songs by same artist, 2 songs by different artists
+        let songsSameArtist = (1 ... 4).map { TestFixtures.makeSong(id: "same-\($0)", title: "Same \($0)", artistName: "Dominant Artist") }
+        let songOther1 = TestFixtures.makeSong(id: "other-1", title: "Other 1", artistName: "Different Artist 1")
+        let songOther2 = TestFixtures.makeSong(id: "other-2", title: "Other 2", artistName: "Different Artist 2")
+
+        var items: [HomeSectionItem] = [.album(album)]
+        items.append(contentsOf: songsSameArtist.map { .song($0) })
+        items.append(.song(songOther1))
+        items.append(.song(songOther2))
+
+        let section = HomeSection(id: "sec-div", title: "Listen again", items: items)
+        let provisioned = HomeContentEngine.process(rawSections: [section], affinityEngine: affinityEngine)
+
+        guard let bento = provisioned.jumpBackIn else {
+            Issue.record("Expected bento")
+            return
+        }
+
+        let dominantCount = bento.secondaryItems.filter { $0.subtitle?.contains("Dominant Artist") == true }.count
+        #expect(dominantCount <= 2) // Max 2 per artist
+        #expect(bento.secondaryItems.count == 4)
+    }
 }

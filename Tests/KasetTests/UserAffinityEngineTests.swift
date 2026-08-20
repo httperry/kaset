@@ -24,7 +24,7 @@ struct UserAffinityEngineTests {
         )
 
         #expect(engine.profile.trackPlayCounts["vid-123"] == 1)
-        #expect(engine.affinityScore(forArtist: "The Weeknd") == 10)
+        #expect(engine.affinityScore(forArtist: "The Weeknd") == 20)
         #expect(engine.profile.genreScores["R&B"] == 5)
         #expect(engine.profile.recentVideoIDs.first == "vid-123")
         #expect(engine.profile.recentAlbumIDs.first == "album-456")
@@ -89,7 +89,7 @@ struct UserAffinityEngineTests {
         engine.reconcileWithCloudHistory(historySections: [historySection])
 
         #expect(engine.profile.trackPlayCounts["hist-1"] == 1)
-        #expect(engine.affinityScore(forArtist: "The Weeknd") == 10)
+        #expect(engine.affinityScore(forArtist: "The Weeknd") == 20)
 
         let likedSong = TestFixtures.makeSong(id: "like-1", title: "Espresso", artistName: "Sabrina Carpenter")
         engine.reconcileWithCloudLikes(likedSongs: [likedSong])
@@ -97,5 +97,62 @@ struct UserAffinityEngineTests {
         #expect(engine.profile.likedVideoIDs.contains("like-1"))
         #expect(engine.affinityScore(forArtist: "Sabrina Carpenter") == 20)
         #expect(engine.profile.lastSyncedAt != nil)
+    }
+
+    @Test("Ebbinghaus temporal decay exponentially reduces older plays")
+    func temporalDecayExponential() {
+        let weight1h = UserAffinityEngine.temporalDecayWeight(elapsedHours: 1.0)
+        let weight24h = UserAffinityEngine.temporalDecayWeight(elapsedHours: 24.0)
+        let weight96h = UserAffinityEngine.temporalDecayWeight(elapsedHours: 96.0)
+        let weight360h = UserAffinityEngine.temporalDecayWeight(elapsedHours: 360.0)
+
+        #expect(weight1h > 0.95)
+        #expect(weight24h > 0.60 && weight24h < 0.65)
+        #expect(weight96h > 0.10 && weight96h < 0.20)
+        #expect(weight360h < 0.001)
+    }
+
+    @Test("Inverted-U exposure curve saturates and decays at overplay threshold")
+    func exposureCurveSaturation() {
+        let bonus1 = UserAffinityEngine.exposureBonus(playCount: 1)
+        let bonus5 = UserAffinityEngine.exposureBonus(playCount: 5)
+        let bonus10 = UserAffinityEngine.exposureBonus(playCount: 10)
+        let bonus30 = UserAffinityEngine.exposureBonus(playCount: 30)
+
+        #expect(bonus1 == 15.0)
+        #expect(bonus5 == 75.0)
+        #expect(bonus10 == 100.0)
+        #expect(bonus30 < bonus10) // Decays due to satiation threshold
+    }
+
+    @Test("Disliked tracks and artists receive hard suppression (-1000)")
+    func dislikeHardSuppression() {
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let engine = UserAffinityEngine(storageDirectory: tempDir, skipPersistence: true)
+
+        engine.recordPlay(videoId: "vid-bad", artist: "Bad Artist", completed: true)
+        engine.recordDislike(videoId: "vid-bad", artist: "Bad Artist")
+
+        let score = engine.computeAffinityScore(videoId: "vid-bad", artist: "Bad Artist")
+        #expect(score < 0)
+    }
+
+    @Test("Backward-compatible decoding succeeds for legacy JSON profiles")
+    func backwardCompatibleDecoding() throws {
+        let legacyJSON = """
+        {
+            "accountScopeID": "test-user",
+            "artistScores": {"Eminem": 50},
+            "trackPlayCounts": {"em-1": 3},
+            "likedVideoIDs": ["em-1"],
+            "recentVideoIDs": ["em-1"]
+        }
+        """
+
+        let decoded = try JSONDecoder().decode(UserAffinityProfile.self, from: Data(legacyJSON.utf8))
+        #expect(decoded.accountScopeID == "test-user")
+        #expect(decoded.dislikedVideoIDs.isEmpty)
+        #expect(decoded.playTimestamps.isEmpty)
+        #expect(decoded.shelfOrderSeed == 0)
     }
 }
