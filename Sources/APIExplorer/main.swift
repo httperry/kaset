@@ -3433,16 +3433,27 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         print()
 
         var recentHistoryItems: [CurateExplorerItem] = []
+        var trackHistoryCounts: [String: Int] = [:]
+        var artistHistoryCounts: [String: Int] = [:]
+
         if hasAuth {
             if let (histData, hStatus) = try? await makeRequest(
                 endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
             ), hStatus == 200 {
                 let histShelves = extractCurateExplorerShelves(from: histData)
                 recentHistoryItems = histShelves.flatMap(\.items)
-                if let topTrack = recentHistoryItems.first {
-                    print("🕒 Real-Time Playback Signal: \"\(topTrack.title)\" — \(topTrack.subtitle)")
-                    print()
+                for item in recentHistoryItems {
+                    trackHistoryCounts[item.title, default: 0] += 1
+                    let cleanArtist = item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? item.subtitle
+                    artistHistoryCounts[cleanArtist, default: 0] += 1
                 }
+                if let topTrack = recentHistoryItems.first {
+                    print("🕒 Latest Played: \"\(topTrack.title)\" — \(topTrack.subtitle)")
+                }
+                if let (topArtist, aCount) = artistHistoryCounts.max(by: { $0.value < $1.value }), aCount > 1 {
+                    print("🔥 Heavy Rotation Artist in History: \(topArtist) (\(aCount) tracks played)")
+                }
+                print()
             }
         }
 
@@ -3472,14 +3483,30 @@ func exploreHomeCurate(verbose _: Bool = false) async {
             }
         }
 
-        // Priority 2: Real-time top history item if Supermix is not on the page
-        if !foundHero, let topRecent = recentHistoryItems.first {
-            heroTitle = topRecent.title
-            heroSubtitle = topRecent.subtitle
-            heroDesc = "Jump back into your recent rotation with curated recommendations."
-            heroBadge = "RECENT ROTATION"
-            heroThumb = topRecent.thumbnailURL
-            foundHero = true
+        // Priority 2: Frequency-weighted heavy rotation from history
+        if !foundHero, !recentHistoryItems.isEmpty {
+            // Find track with highest frequency and artist affinity in history
+            let topHeavyTrack = recentHistoryItems.max { lhs, rhs in
+                let lhsCount = trackHistoryCounts[lhs.title, default: 0]
+                let rhsCount = trackHistoryCounts[rhs.title, default: 0]
+                let lhsArtist = lhs.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? lhs.subtitle
+                let rhsArtist = rhs.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? rhs.subtitle
+                let lhsArtistCount = artistHistoryCounts[lhsArtist, default: 0]
+                let rhsArtistCount = artistHistoryCounts[rhsArtist, default: 0]
+
+                let lhsScore = (lhsCount * 20) + (lhsArtistCount * 10)
+                let rhsScore = (rhsCount * 20) + (rhsArtistCount * 10)
+                return lhsScore < rhsScore
+            }
+
+            if let topCandidate = topHeavyTrack {
+                heroTitle = topCandidate.title
+                heroSubtitle = topCandidate.subtitle
+                heroDesc = "Your top frequent rotation and personalized recommendations."
+                heroBadge = "HEAVY ROTATION"
+                heroThumb = topCandidate.thumbnailURL
+                foundHero = true
+            }
         }
 
         // Priority 3: First item from raw shelves
@@ -3504,7 +3531,18 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         // 2. Activity Bento ("Jump Back In")
         let candidateItems = shelves.flatMap(\.items)
         let primaryBento = candidateItems.first { $0.isAlbumOrPlaylist } ?? candidateItems.first
-        let secondaryBento = candidateItems.filter { $0.id != primaryBento?.id }.prefix(4)
+
+        var secondaryBento: [CurateExplorerItem] = []
+        if !recentHistoryItems.isEmpty {
+            secondaryBento = Array(
+                recentHistoryItems
+                    .filter { $0.title != heroTitle && $0.title != primaryBento?.title }
+                    .prefix(4)
+            )
+        }
+        if secondaryBento.isEmpty {
+            secondaryBento = Array(candidateItems.filter { $0.id != primaryBento?.id }.prefix(4))
+        }
 
         print("═══════════════════════════════════════════════════════════════════════════════")
         print("🍱 LAYER 2: ASYMMETRIC ACTIVITY BENTO (Jump Back In)")

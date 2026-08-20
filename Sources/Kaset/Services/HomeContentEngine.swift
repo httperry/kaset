@@ -78,18 +78,27 @@ enum HomeContentEngine {
             }
         }
 
-        // Priority 2: Match top recent album or video from local telemetry
-        if let topRecentVideoId = affinityEngine.profile.recentVideoIDs.first,
-           let matchingItem = sections.flatMap(\.items).first(where: { $0.videoId == topRecentVideoId })
-        {
+        // Priority 2: Highest frequency/affinity scored item from user taste profile
+        let allItems = sections.flatMap(\.items)
+        let scoredCandidates = allItems.map { item -> (item: HomeSectionItem, score: Int) in
+            let score = affinityEngine.computeAffinityScore(
+                videoId: item.videoId,
+                artist: item.subtitle,
+                albumId: item.album?.id
+            )
+            return (item, score)
+        }
+
+        if let topScored = scoredCandidates.filter({ $0.score >= 20 }).max(by: { $0.score < $1.score }) {
+            let item = topScored.item
             return HomeHeroItemPayload(
-                id: matchingItem.id,
-                title: matchingItem.title,
-                artistSubtitle: matchingItem.subtitle ?? "Recent Rotation",
-                editorialDescription: "Jump back into your recent rotation with curated recommendations.",
-                thumbnailURL: matchingItem.thumbnailURL,
+                id: item.id,
+                title: item.title,
+                artistSubtitle: item.subtitle ?? "Heavy Rotation",
+                editorialDescription: "Your top frequent rotation and personalized recommendations.",
+                thumbnailURL: item.thumbnailURL,
                 badgeText: "HEAVY ROTATION",
-                playTarget: self.makePlayTarget(from: matchingItem)
+                playTarget: Self.makePlayTarget(from: item)
             )
         }
 
@@ -153,17 +162,17 @@ enum HomeContentEngine {
 
         guard !uniqueCandidates.isEmpty else { return nil }
 
-        // Sort candidates by recent playback recency & artist affinity if available
+        // Sort candidates by composite affinity & frequency score
         uniqueCandidates.sort { lhs, rhs in
-            let lhsRecentIndex = lhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
-            let rhsRecentIndex = rhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
-            if lhsRecentIndex != rhsRecentIndex {
-                return lhsRecentIndex < rhsRecentIndex
+            let lhsScore = affinityEngine.computeAffinityScore(videoId: lhs.videoId, artist: lhs.subtitle, albumId: lhs.album?.id)
+            let rhsScore = affinityEngine.computeAffinityScore(videoId: rhs.videoId, artist: rhs.subtitle, albumId: rhs.album?.id)
+            if lhsScore != rhsScore {
+                return lhsScore > rhsScore
             }
 
-            let lhsArtistScore = lhs.subtitle.map { affinityEngine.affinityScore(forArtist: $0) } ?? 0
-            let rhsArtistScore = rhs.subtitle.map { affinityEngine.affinityScore(forArtist: $0) } ?? 0
-            return lhsArtistScore > rhsArtistScore
+            let lhsRecentIndex = lhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
+            let rhsRecentIndex = rhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
+            return lhsRecentIndex < rhsRecentIndex
         }
 
         // Find best primary candidate (prefer an album or playlist over an isolated song)

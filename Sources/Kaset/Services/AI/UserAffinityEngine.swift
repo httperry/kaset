@@ -209,6 +209,43 @@ final class UserAffinityEngine {
         return 0
     }
 
+    /// Computes a composite affinity score for an item considering play frequency, artist affinity, likes, and recency.
+    func computeAffinityScore(videoId: String?, artist: String?, albumId: String? = nil) -> Int {
+        var totalScore = 0
+
+        // 1. Play frequency weight (+15 per play)
+        if let videoId, let count = self.profile.trackPlayCounts[videoId] {
+            totalScore += count * 15
+        }
+
+        // 2. Artist affinity weight
+        if let artist {
+            totalScore += self.affinityScore(forArtist: artist)
+        }
+
+        // 3. Like status (+30)
+        if let videoId, self.profile.likedVideoIDs.contains(videoId) {
+            totalScore += 30
+        }
+
+        // 4. Recency bonus (Top 5 recents get +10, top 20 get +5)
+        if let videoId, let recentIndex = self.profile.recentVideoIDs.firstIndex(of: videoId) {
+            if recentIndex < 5 {
+                totalScore += 10
+            } else if recentIndex < 20 {
+                totalScore += 5
+            }
+        }
+
+        if let albumId, let albumRecentIndex = self.profile.recentAlbumIDs.firstIndex(of: albumId) {
+            if albumRecentIndex < 3 {
+                totalScore += 20
+            }
+        }
+
+        return totalScore
+    }
+
     // MARK: - Cloud Delta Reconciliation
 
     /// Reconciles local profile with cloud history from YouTube Music.
