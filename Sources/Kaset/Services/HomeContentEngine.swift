@@ -57,7 +57,7 @@ enum HomeContentEngine {
     /// Selects or synthesizes the top featured Hero banner item.
     static func selectHeroItem(
         from sections: [HomeSection],
-        affinityEngine _: UserAffinityEngine
+        affinityEngine: UserAffinityEngine
     ) -> HomeHeroItemPayload? {
         // Priority 1: Check for "Your Supermix" or "My Mix" in raw sections
         for section in sections {
@@ -78,7 +78,22 @@ enum HomeContentEngine {
             }
         }
 
-        // Priority 2: Top item from "Listen again" or "Quick picks"
+        // Priority 2: Match top recent album or video from local telemetry
+        if let topRecentVideoId = affinityEngine.profile.recentVideoIDs.first,
+           let matchingItem = sections.flatMap(\.items).first(where: { $0.videoId == topRecentVideoId })
+        {
+            return HomeHeroItemPayload(
+                id: matchingItem.id,
+                title: matchingItem.title,
+                artistSubtitle: matchingItem.subtitle ?? "Recent Rotation",
+                editorialDescription: "Jump back into your recent rotation with curated recommendations.",
+                thumbnailURL: matchingItem.thumbnailURL,
+                badgeText: "HEAVY ROTATION",
+                playTarget: self.makePlayTarget(from: matchingItem)
+            )
+        }
+
+        // Priority 3: Top item from "Listen again" or "Quick picks"
         if let firstSection = sections.first(where: {
             let lower = $0.title.lowercased()
             return lower.contains("listen again") || lower.contains("quick picks") || lower.contains("favourites")
@@ -90,11 +105,11 @@ enum HomeContentEngine {
                 editorialDescription: "Jump back into your recent rotation with curated recommendations.",
                 thumbnailURL: firstItem.thumbnailURL,
                 badgeText: "HEAVY ROTATION",
-                playTarget: self.makePlayTarget(from: firstItem)
+                playTarget: Self.makePlayTarget(from: firstItem)
             )
         }
 
-        // Priority 3: First available item
+        // Priority 4: First available item
         if let firstItem = sections.first?.items.first {
             return HomeHeroItemPayload(
                 id: firstItem.id,
@@ -115,7 +130,7 @@ enum HomeContentEngine {
     /// Selects the 1 primary feature item and 4 secondary pill items for the Activity Bento.
     static func selectJumpBackIn(
         from sections: [HomeSection],
-        affinityEngine _: UserAffinityEngine
+        affinityEngine: UserAffinityEngine
     ) -> HomeBentoItemPayload? {
         // Collect candidate items from "Listen again", "Quick picks", "From your Library"
         var candidateItems: [HomeSectionItem] = []
@@ -134,9 +149,22 @@ enum HomeContentEngine {
 
         // Deduplicate candidates by ID
         var seenIDs = Set<String>()
-        let uniqueCandidates = candidateItems.filter { seenIDs.insert($0.id).inserted }
+        var uniqueCandidates = candidateItems.filter { seenIDs.insert($0.id).inserted }
 
         guard !uniqueCandidates.isEmpty else { return nil }
+
+        // Sort candidates by recent playback recency & artist affinity if available
+        uniqueCandidates.sort { lhs, rhs in
+            let lhsRecentIndex = lhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
+            let rhsRecentIndex = rhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
+            if lhsRecentIndex != rhsRecentIndex {
+                return lhsRecentIndex < rhsRecentIndex
+            }
+
+            let lhsArtistScore = lhs.subtitle.map { affinityEngine.affinityScore(forArtist: $0) } ?? 0
+            let rhsArtistScore = rhs.subtitle.map { affinityEngine.affinityScore(forArtist: $0) } ?? 0
+            return lhsArtistScore > rhsArtistScore
+        }
 
         // Find best primary candidate (prefer an album or playlist over an isolated song)
         let primaryItem = uniqueCandidates.first { item in

@@ -3432,6 +3432,20 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         print("📦 Ingested \(shelves.count) raw shelves from YouTube Music")
         print()
 
+        var recentHistoryItems: [CurateExplorerItem] = []
+        if hasAuth {
+            if let (histData, hStatus) = try? await makeRequest(
+                endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
+            ), hStatus == 200 {
+                let histShelves = extractCurateExplorerShelves(from: histData)
+                recentHistoryItems = histShelves.flatMap(\.items)
+                if let topTrack = recentHistoryItems.first {
+                    print("🕒 Real-Time Playback Signal: \"\(topTrack.title)\" — \(topTrack.subtitle)")
+                    print()
+                }
+            }
+        }
+
         // 1. Hero Candidate Selection
         var heroTitle = "Your Supermix"
         var heroSubtitle = "Personalized Mix"
@@ -3440,6 +3454,8 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         var heroThumb: String?
 
         var foundHero = false
+
+        // Priority 1: Check for "Your Supermix" or "My Mix" in raw sections
         for shelf in shelves {
             for item in shelf.items {
                 let lower = item.title.lowercased()
@@ -3456,6 +3472,17 @@ func exploreHomeCurate(verbose _: Bool = false) async {
             }
         }
 
+        // Priority 2: Real-time top history item if Supermix is not on the page
+        if !foundHero, let topRecent = recentHistoryItems.first {
+            heroTitle = topRecent.title
+            heroSubtitle = topRecent.subtitle
+            heroDesc = "Jump back into your recent rotation with curated recommendations."
+            heroBadge = "RECENT ROTATION"
+            heroThumb = topRecent.thumbnailURL
+            foundHero = true
+        }
+
+        // Priority 3: First item from raw shelves
         if !foundHero, let firstItem = shelves.first?.items.first {
             heroTitle = firstItem.title
             heroSubtitle = firstItem.subtitle
