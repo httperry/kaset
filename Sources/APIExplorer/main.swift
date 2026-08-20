@@ -3433,8 +3433,15 @@ func exploreHomeCurate(verbose _: Bool = false) async {
         var decayedHistoryItems: [CurateExplorerItem] = []
         var trackDecayedScores: [String: Double] = [:]
         var artistDecayedScores: [String: Double] = [:]
+        var likedSongTitles: Set<String> = []
 
         if hasAuth {
+            if let (likedData, likedStatus) = try? await makeRequest(
+                endpoint: "browse", body: ["browseId": "FEmusic_liked_videos"], authenticated: true
+            ), likedStatus == 200 {
+                likedSongTitles = extractLikedSongTitles(from: likedData)
+            }
+
             if let (histData, hStatus) = try? await makeRequest(
                 endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
             ), hStatus == 200 {
@@ -3472,7 +3479,8 @@ func exploreHomeCurate(verbose _: Bool = false) async {
                         }
                         globalIndex += 1
 
-                        let decay = exp(-0.02 * hours)
+                        let hoursClamped = max(0.1, hours)
+                        let decay = pow(hoursClamped, -0.5) // ACT-R Power Law Decay (d = 0.5)
                         let cleanArtist = item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? item.subtitle
                         decayedHistoryItems.append(item)
                         trackDecayedScores[item.title, default: 0.0] += 25.0 * decay
@@ -3482,9 +3490,12 @@ func exploreHomeCurate(verbose _: Bool = false) async {
                 if let topTrack = decayedHistoryItems.first {
                     print("🕒 Latest Played: \"\(topTrack.title)\" — \(topTrack.subtitle)")
                 }
-                // Print top artist by decay-adjusted score
+                if !likedSongTitles.isEmpty {
+                    print("❤️ Synced \(likedSongTitles.count) Liked Songs into Spreading Activation")
+                }
+                // Print top artist by ACT-R score
                 if let (topArtist, score) = artistDecayedScores.max(by: { $0.value < $1.value }), score >= 2.0 {
-                    print("🔥 Active Heavy Rotation Artist: \(topArtist) (temporal decay score: \(String(format: "%.1f", score)))")
+                    print("🔥 Active Heavy Rotation Artist: \(topArtist) (ACT-R activation: \(String(format: "%.1f", score)))")
                 }
                 print()
             }
@@ -3515,9 +3526,9 @@ func exploreHomeCurate(verbose _: Bool = false) async {
             }
         }
 
-        // Priority 2: Temporal-decay-weighted heavy rotation from history
+        // Priority 2: ACT-R Cognitive & Spreading-Activation Heavy Rotation
         if !foundHero, !decayedHistoryItems.isEmpty {
-            // Find track with highest combined track & artist decay score
+            // Find track with highest combined ACT-R Base & Spreading activation score
             let topCandidate = decayedHistoryItems.max { lhs, rhs in
                 let lhsTrackScore = trackDecayedScores[lhs.title, default: 0.0]
                 let rhsTrackScore = trackDecayedScores[rhs.title, default: 0.0]
@@ -3526,8 +3537,13 @@ func exploreHomeCurate(verbose _: Bool = false) async {
                 let lhsArtistScore = artistDecayedScores[lhsArtist, default: 0.0]
                 let rhsArtistScore = artistDecayedScores[rhsArtist, default: 0.0]
 
-                let lhsTotal = lhsTrackScore + lhsArtistScore
-                let rhsTotal = rhsTrackScore + rhsArtistScore
+                let lhsLiked = likedSongTitles.contains(lhs.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+                let rhsLiked = likedSongTitles.contains(rhs.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+                let lhsSpreading = lhsLiked ? (15.0 * 25.0) : 0.0
+                let rhsSpreading = rhsLiked ? (15.0 * 25.0) : 0.0
+
+                let lhsTotal = lhsTrackScore + lhsSpreading + (lhsArtistScore * 0.4)
+                let rhsTotal = rhsTrackScore + rhsSpreading + (rhsArtistScore * 0.4)
                 return lhsTotal < rhsTotal
             }
 
