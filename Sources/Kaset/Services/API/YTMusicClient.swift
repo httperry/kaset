@@ -1492,6 +1492,15 @@ final class YTMusicClient: YTMusicClientProtocol {
         _ = try await self.request(endpoint, body: body)
         self.logger.info("Successfully rated song \(videoId)")
 
+        switch rating {
+        case .like:
+            UserAffinityEngine.shared.recordLike(videoId: videoId)
+        case .dislike:
+            UserAffinityEngine.shared.recordDislike(videoId: videoId)
+        case .indifferent:
+            break
+        }
+
         // Invalidate mutation-affected caches in a single pass
         self.cache.invalidateMutationCaches()
     }
@@ -1604,6 +1613,9 @@ final class YTMusicClient: YTMusicClientProtocol {
         }
 
         self.logger.info("Successfully created playlist \(playlistId, privacy: .public)")
+        for vid in videoIds {
+            UserAffinityEngine.shared.recordPlaylistAdd(videoId: vid)
+        }
         self.cache.invalidateMutationCaches()
         return playlistId
     }
@@ -1627,6 +1639,8 @@ final class YTMusicClient: YTMusicClientProtocol {
 
         _ = try await self.request("browse/edit_playlist", body: body)
         self.logger.info("Successfully added song \(videoId) to playlist \(playlistId)")
+
+        UserAffinityEngine.shared.recordPlaylistAdd(videoId: videoId)
 
         self.cache.invalidateMutationCaches()
     }

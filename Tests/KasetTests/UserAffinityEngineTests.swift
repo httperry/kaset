@@ -20,7 +20,7 @@ struct UserAffinityEngineTests {
             artist: "The Weeknd",
             albumId: "album-456",
             genre: "R&B",
-            completed: true
+            listenedSeconds: 100.0, totalSeconds: 100.0
         )
 
         #expect(engine.profile.trackPlayCounts["vid-123"] == 1)
@@ -47,7 +47,7 @@ struct UserAffinityEngineTests {
         let engine = UserAffinityEngine(storageDirectory: tempDir, skipPersistence: true)
 
         // Give user high affinity for The Weeknd
-        engine.recordPlay(videoId: "vid-1", artist: "The Weeknd", completed: true)
+        engine.recordPlay(videoId: "vid-1", artist: "The Weeknd", listenedSeconds: 100.0, totalSeconds: 100.0)
 
         // Create a shelf for Camila Cabello (0 affinity)
         let camilaItems: [HomeSectionItem] = (0 ..< 4).map { idx in
@@ -130,7 +130,7 @@ struct UserAffinityEngineTests {
         let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         let engine = UserAffinityEngine(storageDirectory: tempDir, skipPersistence: true)
 
-        engine.recordPlay(videoId: "vid-bad", artist: "Bad Artist", completed: true)
+        engine.recordPlay(videoId: "vid-bad", artist: "Bad Artist", listenedSeconds: 100.0, totalSeconds: 100.0)
         engine.recordDislike(videoId: "vid-bad", artist: "Bad Artist")
 
         let score = engine.computeAffinityScore(videoId: "vid-bad", artist: "Bad Artist")
@@ -154,5 +154,58 @@ struct UserAffinityEngineTests {
         #expect(decoded.dislikedVideoIDs.isEmpty)
         #expect(decoded.playTimestamps.isEmpty)
         #expect(decoded.shelfOrderSeed == 0)
+    }
+
+    @Test("ACT-R Attention Weighting properly rewards full plays and penalizes skips")
+    func attentionWeightingBehaviors() {
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let engine = UserAffinityEngine(storageDirectory: tempDir, skipPersistence: true)
+
+        // Track 1: Early skip (< 20% duration)
+        engine.recordPlay(videoId: "skip-1", artist: "Skipped Artist", listenedSeconds: 10.0, totalSeconds: 200.0)
+        #expect(engine.profile.playbackEvents["skip-1"]?.first?.attentionWeight == -1.0)
+
+        // Track 2: Half listen (50% duration)
+        engine.recordPlay(videoId: "half-1", artist: "Half Artist", listenedSeconds: 100.0, totalSeconds: 200.0)
+        #expect(engine.profile.playbackEvents["half-1"]?.first?.attentionWeight == 0.5)
+
+        // Track 3: Full listen (100% duration)
+        engine.recordPlay(videoId: "full-1", artist: "Full Artist", listenedSeconds: 200.0, totalSeconds: 200.0)
+        #expect(engine.profile.playbackEvents["full-1"]?.first?.attentionWeight == 1.0)
+
+        // Track 4: Looped / Replayed (200% duration)
+        engine.recordPlay(videoId: "loop-1", artist: "Loop Artist", listenedSeconds: 400.0, totalSeconds: 200.0)
+        #expect(engine.profile.playbackEvents["loop-1"]?.first?.attentionWeight == 2.0)
+    }
+
+    @Test("Spreading activation provides permanent intent boosts for Likes and Playlist Curation")
+    func spreadingActivationPermastore() {
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let engine = UserAffinityEngine(storageDirectory: tempDir, skipPersistence: true)
+
+        // Play track 30 days ago (approx 720 hours)
+        let oldDate = Date().addingTimeInterval(-720.0 * 3600.0)
+        engine.recordPlay(
+            videoId: "old-track",
+            artist: "Old Artist",
+            listenedSeconds: 200.0,
+            totalSeconds: 200.0,
+            timestamp: oldDate
+        )
+
+        let initialScore = engine.computeAffinityScore(videoId: "old-track", artist: "Old Artist")
+
+        // Curate track to playlist (+25 spreading activation)
+        engine.recordPlaylistAdd(videoId: "old-track", artist: "Old Artist")
+        let curatedScore = engine.computeAffinityScore(videoId: "old-track", artist: "Old Artist")
+
+        #expect(curatedScore > initialScore)
+        #expect(curatedScore >= 25.0 * 25.0) // 25.0 spreading activation * UI scale (25.0)
+
+        // Also like track (+15 spreading activation)
+        engine.recordLike(videoId: "old-track", artist: "Old Artist")
+        let likedAndCuratedScore = engine.computeAffinityScore(videoId: "old-track", artist: "Old Artist")
+
+        #expect(likedAndCuratedScore > curatedScore)
     }
 }

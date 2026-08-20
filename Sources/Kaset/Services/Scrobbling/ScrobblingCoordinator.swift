@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import Observation
 
@@ -607,6 +608,25 @@ final class ScrobblingCoordinator {
         }
 
         self.logger.debug("Finalized track (accumulated: \(String(format: "%.1f", self.trackTracker?.accumulatedPlayTime ?? 0))s, scrobbled: \(self.trackTracker?.hasScrobbled ?? false))")
+
+        // Report continuous attention weight to the AI Affinity Engine
+        if let song = self.trackedSong,
+           let tracker = self.trackTracker,
+           let duration = self.trackedVideoDuration,
+           duration > 0
+        {
+            let videoId = song.videoId
+            Task { @MainActor in
+                UserAffinityEngine.shared.recordPlay(
+                    videoId: videoId,
+                    artist: song.artistsDisplay,
+                    albumId: song.album?.id,
+                    listenedSeconds: tracker.accumulatedPlayTime,
+                    totalSeconds: duration,
+                    timestamp: tracker.startTime
+                )
+            }
+        }
 
         // Reset tracking state
         self.currentTrackVideoId = nil

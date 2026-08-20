@@ -9,6 +9,14 @@ import Foundation
 import Observation
 import os
 
+// MARK: - PlaybackEvent
+
+/// Records a continuous attention weight for a specific playback instance.
+struct PlaybackEvent: Codable, Equatable, Sendable {
+    var timestamp: Date
+    var attentionWeight: Double
+}
+
 // MARK: - UserAffinityProfile
 
 /// Persistent snapshot of user listening taste, affinity scores, and interaction telemetry.
@@ -18,11 +26,13 @@ struct UserAffinityProfile: Codable, Equatable, Sendable {
     var artistScores: [String: Int]
     var genreScores: [String: Int]
     var trackPlayCounts: [String: Int]
+    var playTimestamps: [String: [Date]]
+    var playbackEvents: [String: [PlaybackEvent]]
+    var curatedVideoIDs: Set<String>
     var likedVideoIDs: Set<String>
     var dislikedVideoIDs: Set<String>
     var dislikedArtistIDs: Set<String>
     var skippedVideoIDs: [String: Int]
-    var playTimestamps: [String: [Date]]
     var recentVideoIDs: [String]
     var recentAlbumIDs: [String]
     var lastHeroItemID: String?
@@ -35,11 +45,13 @@ struct UserAffinityProfile: Codable, Equatable, Sendable {
         artistScores: [String: Int] = [:],
         genreScores: [String: Int] = [:],
         trackPlayCounts: [String: Int] = [:],
+        playTimestamps: [String: [Date]] = [:],
+        playbackEvents: [String: [PlaybackEvent]] = [:],
+        curatedVideoIDs: Set<String> = [],
         likedVideoIDs: Set<String> = [],
         dislikedVideoIDs: Set<String> = [],
         dislikedArtistIDs: Set<String> = [],
         skippedVideoIDs: [String: Int] = [:],
-        playTimestamps: [String: [Date]] = [:],
         recentVideoIDs: [String] = [],
         recentAlbumIDs: [String] = [],
         lastHeroItemID: String? = nil,
@@ -51,11 +63,13 @@ struct UserAffinityProfile: Codable, Equatable, Sendable {
         self.artistScores = artistScores
         self.genreScores = genreScores
         self.trackPlayCounts = trackPlayCounts
+        self.playTimestamps = playTimestamps
+        self.playbackEvents = playbackEvents
+        self.curatedVideoIDs = curatedVideoIDs
         self.likedVideoIDs = likedVideoIDs
         self.dislikedVideoIDs = dislikedVideoIDs
         self.dislikedArtistIDs = dislikedArtistIDs
         self.skippedVideoIDs = skippedVideoIDs
-        self.playTimestamps = playTimestamps
         self.recentVideoIDs = recentVideoIDs
         self.recentAlbumIDs = recentAlbumIDs
         self.lastHeroItemID = lastHeroItemID
@@ -69,11 +83,13 @@ struct UserAffinityProfile: Codable, Equatable, Sendable {
         case artistScores
         case genreScores
         case trackPlayCounts
+        case playTimestamps
+        case playbackEvents
+        case curatedVideoIDs
         case likedVideoIDs
         case dislikedVideoIDs
         case dislikedArtistIDs
         case skippedVideoIDs
-        case playTimestamps
         case recentVideoIDs
         case recentAlbumIDs
         case lastHeroItemID
@@ -88,11 +104,19 @@ struct UserAffinityProfile: Codable, Equatable, Sendable {
         self.artistScores = try container.decodeIfPresent([String: Int].self, forKey: .artistScores) ?? [:]
         self.genreScores = try container.decodeIfPresent([String: Int].self, forKey: .genreScores) ?? [:]
         self.trackPlayCounts = try container.decodeIfPresent([String: Int].self, forKey: .trackPlayCounts) ?? [:]
+
+        self.playbackEvents = try container.decodeIfPresent([String: [PlaybackEvent]].self, forKey: .playbackEvents) ?? [:]
+        self.curatedVideoIDs = try container.decodeIfPresent(Set<String>.self, forKey: .curatedVideoIDs) ?? []
+        let legacyTimestamps = try container.decodeIfPresent([String: [Date]].self, forKey: .playTimestamps) ?? [:]
+        for (videoId, dates) in legacyTimestamps where self.playbackEvents[videoId] == nil {
+            self.playbackEvents[videoId] = dates.map { PlaybackEvent(timestamp: $0, attentionWeight: 1.0) }
+        }
+        self.playTimestamps = legacyTimestamps
+
         self.likedVideoIDs = try container.decodeIfPresent(Set<String>.self, forKey: .likedVideoIDs) ?? []
         self.dislikedVideoIDs = try container.decodeIfPresent(Set<String>.self, forKey: .dislikedVideoIDs) ?? []
         self.dislikedArtistIDs = try container.decodeIfPresent(Set<String>.self, forKey: .dislikedArtistIDs) ?? []
         self.skippedVideoIDs = try container.decodeIfPresent([String: Int].self, forKey: .skippedVideoIDs) ?? [:]
-        self.playTimestamps = try container.decodeIfPresent([String: [Date]].self, forKey: .playTimestamps) ?? [:]
         self.recentVideoIDs = try container.decodeIfPresent([String].self, forKey: .recentVideoIDs) ?? []
         self.recentAlbumIDs = try container.decodeIfPresent([String].self, forKey: .recentAlbumIDs) ?? []
         self.lastHeroItemID = try container.decodeIfPresent(String.self, forKey: .lastHeroItemID)
@@ -246,19 +270,31 @@ final class UserAffinityEngine {
         artist: String? = nil,
         albumId: String? = nil,
         genre: String? = nil,
-        completed: Bool = true,
+        listenedSeconds: Double,
+        totalSeconds: Double,
         isAutoplay: Bool = false,
         timestamp: Date = Date()
     ) {
         self.profile.trackPlayCounts[videoId, default: 0] += 1
-        var timestamps = self.profile.playTimestamps[videoId, default: []]
-        timestamps.append(timestamp)
-        if timestamps.count > 30 {
-            timestamps = Array(timestamps.suffix(30))
-        }
-        self.profile.playTimestamps[videoId] = timestamps
 
-        let intentMultiplier: Double = isAutoplay ? 0.3 : (completed ? 2.0 : 1.0)
+        let ratio = totalSeconds > 0 ? (listenedSeconds / totalSeconds) : 1.0
+        let attentionWeight: Double = if ratio < 0.2 {
+            -1.0
+        } else if ratio <= 0.8 {
+            ratio
+        } else {
+            ratio // Allows > 1.0 for looping
+        }
+
+        var events = self.profile.playbackEvents[videoId, default: []]
+        events.append(PlaybackEvent(timestamp: timestamp, attentionWeight: attentionWeight))
+        if events.count > 30 {
+            events = Array(events.suffix(30))
+        }
+        self.profile.playbackEvents[videoId] = events
+        self.profile.playTimestamps[videoId] = events.map(\.timestamp) // For legacy sync
+
+        let intentMultiplier: Double = isAutoplay ? 0.3 : (attentionWeight >= 0.8 ? 2.0 : 1.0)
         let artistIncrement = Int(10.0 * intentMultiplier)
         if let artist = artist?.trimmingCharacters(in: .whitespacesAndNewlines), !artist.isEmpty {
             self.profile.artistScores[artist, default: 0] += artistIncrement
@@ -283,6 +319,17 @@ final class UserAffinityEngine {
             }
         }
 
+        self.scheduleSave()
+    }
+
+    // Records a user like action (explicit high motivation signal).
+
+    /// Records a user deliberately categorizing a track (highest explicit signal).
+    func recordPlaylistAdd(videoId: String, artist: String? = nil) {
+        self.profile.curatedVideoIDs.insert(videoId)
+        if let artist = artist?.trimmingCharacters(in: .whitespacesAndNewlines), !artist.isEmpty {
+            self.profile.artistScores[artist, default: 0] += 60
+        }
         self.scheduleSave()
     }
 
@@ -368,33 +415,28 @@ final class UserAffinityEngine {
 
         var compositeScore = 0.0
 
-        // 2. Play events with exponential temporal decay
         if let videoId {
-            let timestamps = self.profile.playTimestamps[videoId] ?? []
-            var effectivePlays = 0.0
-            if timestamps.isEmpty, let count = self.profile.trackPlayCounts[videoId], count > 0 {
-                // Fallback for untimestamped history: evaluate with flat conservative weight
-                compositeScore += Double(count) * 10.0
-                effectivePlays = Double(count)
-            } else {
-                for date in timestamps {
-                    let hours = max(0, referenceDate.timeIntervalSince(date) / 3600.0)
-                    let decay = Self.temporalDecayWeight(elapsedHours: hours)
-                    compositeScore += 25.0 * decay
-                    effectivePlays += decay
+            // 2. ACT-R Base-Level Activation (Power Law & Attention Weighting)
+            var baseActivation = 0.0
+            if let events = self.profile.playbackEvents[videoId], !events.isEmpty {
+                for event in events {
+                    let hoursSince = max(0.1, referenceDate.timeIntervalSince(event.timestamp) / 3600.0)
+                    baseActivation += event.attentionWeight * pow(hoursSince, -0.5) // d = 0.5 ACT-R Decay
                 }
+            } else if let count = self.profile.trackPlayCounts[videoId], count > 0 {
+                // Fallback for untimestamped history
+                baseActivation = Double(count) * 0.5
             }
 
-            // 3. Exposure saturation curve (Zajonc mere-exposure with Wundt satiation on active decayed plays)
-            let expBonus = Self.exposureBonus(playCount: Int(effectivePlays.rounded()))
-            compositeScore += expBonus
+            // 3. Spreading Activation (System 2 Intent Permastore)
+            let isCurated = self.profile.curatedVideoIDs.contains(videoId)
+            let isLiked = self.profile.likedVideoIDs.contains(videoId)
+            let spreadingActivation: Double = (isCurated ? 25.0 : 0.0) + (isLiked ? 15.0 : 0.0)
 
-            // 4. Like bonus (+40)
-            if self.profile.likedVideoIDs.contains(videoId) {
-                compositeScore += 40.0
-            }
+            // Replaces the old sum of exponential decays and exposure bonus
+            compositeScore += (baseActivation * 25.0) + (spreadingActivation * 25.0) // Scaled for UI sorting
 
-            // 5. Skip penalty (-10 per skip)
+            // 4. Skip penalty (-10 per skip)
             if let skips = self.profile.skippedVideoIDs[videoId], skips > 0 {
                 compositeScore -= Double(skips * 10)
             }
@@ -464,7 +506,8 @@ final class UserAffinityEngine {
                         videoId: song.videoId,
                         artist: song.artistsDisplay,
                         albumId: song.album?.id,
-                        completed: true,
+                        listenedSeconds: 100.0,
+                        totalSeconds: 100.0,
                         timestamp: approximateTimestamp
                     )
                 case let .album(album):

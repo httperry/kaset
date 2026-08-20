@@ -3657,6 +3657,28 @@ func exploreHomeCurate(verbose _: Bool = false) async {
     }
 }
 
+private func extractLikedSongTitles(from data: [String: Any]) -> Set<String> {
+    var titles = Set<String>()
+    if let shelfRenderer = findFirstRenderer(named: "musicPlaylistShelfRenderer", in: data),
+       let shelfContents = shelfRenderer["contents"] as? [[String: Any]]
+    {
+        for item in shelfContents {
+            if let listItem = item["musicResponsiveListItemRenderer"] as? [String: Any],
+               let flexCols = listItem["flexColumns"] as? [[String: Any]],
+               let firstCol = flexCols.first?["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
+               let textObj = firstCol["text"] as? [String: Any],
+               let runs = textObj["runs"] as? [[String: Any]]
+            {
+                let trackTitle = runs.compactMap { $0["text"] as? String }.joined().trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !trackTitle.isEmpty {
+                    titles.insert(trackTitle)
+                }
+            }
+        }
+    }
+    return titles
+}
+
 private func extractCurateExplorerShelves(from data: [String: Any]) -> [CurateExplorerShelf] {
     guard let contents = data["contents"] as? [String: Any],
           let singleColumn = contents["singleColumnBrowseResultsRenderer"] as? [String: Any],
@@ -3786,7 +3808,18 @@ func exploreHistory(count: Int = 25, verbose: Bool = false) async {
             shelf.items.map { (shelfTitle: shelf.title, item: $0) }
         }
 
-        print("✅ Retrieved \(allItems.count) tracks from YouTube Music watch history\n")
+        print("✅ Retrieved \(allItems.count) tracks from YouTube Music watch history")
+
+        // Fetch liked videos to compute Spreading Activation (+15)
+        var likedSongTitles: Set<String> = []
+        if let (likedData, likedStatus) = try? await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_liked_videos"], authenticated: true
+        ), likedStatus == 200 {
+            likedSongTitles = extractLikedSongTitles(from: likedData)
+            print("❤️ Loaded \(likedSongTitles.count) Liked Songs for Spreading Activation\n")
+        } else {
+            print("ℹ️ Liked songs not loaded (Spreading Activation inactive)\n")
+        }
 
         // Precompute global artist scores and play counts with chronological decay
         var trackPlayCounts: [String: Int] = [:]
@@ -3827,7 +3860,8 @@ func exploreHistory(count: Int = 25, verbose: Bool = false) async {
             itemHoursAgo.append(hours)
             globalIndex += 1
 
-            let decay = exp(-0.02 * hours)
+            let hoursClamped = max(0.1, hours)
+            let decay = pow(hoursClamped, -0.5)
             trackPlayCounts[entry.item.title, default: 0] += 1
             trackDecayedScores[entry.item.title, default: 0.0] += 25.0 * decay
             let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
@@ -3842,24 +3876,17 @@ func exploreHistory(count: Int = 25, verbose: Bool = false) async {
             }
 
             let hours = itemHoursAgo[idx]
-            let decay = exp(-0.02 * hours)
+            let hoursClamped = max(0.1, hours)
+            let decay = pow(hoursClamped, -0.5)
             let plays = trackPlayCounts[entry.item.title, default: 1]
             let trackDecayed = trackDecayedScores[entry.item.title, default: 25.0 * decay]
             let effectivePlays = trackDecayed / 25.0
-            let effectivePlayCount = Int(effectivePlays.rounded())
-
-            let expBonus: Double = if effectivePlays < 0.1 {
-                0.0
-            } else if effectivePlayCount <= 5 {
-                Double(effectivePlayCount * 15)
-            } else if effectivePlayCount <= 15 {
-                75.0 + Double((effectivePlayCount - 5) * 5)
-            } else {
-                max(20.0, 125.0 - Double((effectivePlayCount - 15) * 3))
-            }
             let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
             let artistScore = artistDecayedScores[cleanArtist, default: 0.0]
-            let compositeScore = trackDecayed + expBonus + (artistScore * 0.4)
+            let trackBaseActivation = trackDecayedScores[entry.item.title, default: 25.0 * decay]
+            let isLiked = likedSongTitles.contains(entry.item.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+            let spreadingActivation = isLiked ? (15.0 * 25.0) : 0.0
+            let compositeScore = trackBaseActivation + spreadingActivation + (artistScore * 0.4)
 
             let timeStr = if hours < 24 {
                 "~\(String(format: "%.1f", hours))h ago"
@@ -3867,9 +3894,10 @@ func exploreHistory(count: Int = 25, verbose: Bool = false) async {
                 "~\(String(format: "%.1f", hours / 24.0))d ago"
             }
 
-            print("  [\(idx + 1)] \(entry.item.title)")
+            let likeIcon = isLiked ? " ❤️" : ""
+            print("  [\(idx + 1)] \(entry.item.title)\(likeIcon)")
             print("      Artist: \(cleanArtist)")
-            print("      📊 Affinity Score: \(String(format: "%.1f", compositeScore)) pts  [Time: \(timeStr) | Decay: \(String(format: "%.2f", decay)) | Plays: \(plays) | ExpBonus: +\(String(format: "%.0f", expBonus)) | ArtistAffinity: \(String(format: "%.1f", artistScore))]")
+            print("      📊 Affinity Score: \(String(format: "%.1f", compositeScore)) pts  [Time: \(timeStr) | Decay: \(String(format: "%.2f", decay)) | Plays: \(plays) | BaseActivation: \(String(format: "%.1f", trackBaseActivation)) | Spreading: \(isLiked ? "+375.0" : "0.0") | ArtistAffinity: \(String(format: "%.1f", artistScore))]")
             if verbose, let thumb = entry.item.thumbnailURL {
                 print("      Thumbnail: \(thumb)")
             }
@@ -3905,6 +3933,13 @@ func exploreTrackScore(query: String, verbose _: Bool = false) async {
         let shelves = extractCurateExplorerShelves(from: data)
         let allItems = shelves.flatMap { shelf in
             shelf.items.map { (shelfTitle: shelf.title, item: $0) }
+        }
+
+        var likedSongTitles: Set<String> = []
+        if let (likedData, likedStatus) = try? await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_liked_videos"], authenticated: true
+        ), likedStatus == 200 {
+            likedSongTitles = extractLikedSongTitles(from: likedData)
         }
 
         let lowerQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3954,7 +3989,8 @@ func exploreTrackScore(query: String, verbose _: Bool = false) async {
                 }
             }
 
-            let decay = exp(-0.02 * hours)
+            let hoursClamped = max(0.1, hours)
+            let decay = pow(hoursClamped, -0.5)
             let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
             artistDecayedScores[cleanArtist, default: 0.0] += 15.0 * decay
             trackPlayCounts[entry.item.title, default: 0] += 1
@@ -3977,18 +4013,12 @@ func exploreTrackScore(query: String, verbose _: Bool = false) async {
         // Rank all tracks in history
         var seenTitles = Set<String>()
         for entry in allItems where seenTitles.insert(entry.item.title).inserted {
-            let plays = trackPlayCounts[entry.item.title, default: 1]
-            let expBonus = if plays <= 5 {
-                Double(plays * 15)
-            } else if plays <= 15 {
-                75.0 + Double((plays - 5) * 5)
-            } else {
-                max(20.0, 125.0 - Double((plays - 15) * 3))
-            }
             let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
             let artistScore = artistDecayedScores[cleanArtist, default: 0.0]
-            let trackDecayed = trackDecayedScores[entry.item.title, default: 0.0]
-            let score = trackDecayed + expBonus + (artistScore * 0.4)
+            let isItemLiked = likedSongTitles.contains(entry.item.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+            let spreadingScore = isItemLiked ? (15.0 * 25.0) : 0.0
+            let trackBaseActivation = trackDecayedScores[entry.item.title, default: 0.0]
+            let score = (trackBaseActivation * 25.0) + spreadingScore + (artistScore * 0.4)
             allTrackScores.append((title: entry.item.title, score: score))
         }
         allTrackScores.sort { $0.score > $1.score }
@@ -4005,45 +4035,38 @@ func exploreTrackScore(query: String, verbose _: Bool = false) async {
 
         let cleanArtist = primaryMatch.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? primaryMatch.subtitle
         let totalPlays = matchedPlays.count
-        let totalPlayScore = matchedPlays.reduce(0.0) { $0 + (25.0 * $1.decayWeight) }
-        let effectivePlays = totalPlayScore / 25.0
-        let effectivePlayCount = Int(effectivePlays.rounded())
+        let baseActivation = matchedPlays.reduce(0.0) { $0 + $1.decayWeight }
+        let totalPlayScore = baseActivation * 25.0
+        let isPrimaryLiked = likedSongTitles.contains(primaryMatch.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+        let spreadingLikedBonus = isPrimaryLiked ? (15.0 * 25.0) : 0.0
 
-        let expBonus: Double = if effectivePlays < 0.1 {
-            0.0
-        } else if effectivePlayCount <= 5 {
-            Double(effectivePlayCount * 15)
-        } else if effectivePlayCount <= 15 {
-            75.0 + Double((effectivePlayCount - 5) * 5)
-        } else {
-            max(20.0, 125.0 - Double((effectivePlayCount - 15) * 3))
-        }
         let artistAffinity = artistDecayedScores[cleanArtist, default: 0.0]
         let artistContribution = artistAffinity * 0.4
-        let compositeScore = totalPlayScore + expBonus + artistContribution
+        let compositeScore = totalPlayScore + spreadingLikedBonus + artistContribution
 
         let rank = (allTrackScores.firstIndex(where: { $0.title.lowercased() == primaryMatch.title.lowercased() }) ?? 0) + 1
 
-        print("  Track Title:     \(primaryMatch.title)")
+        print("  Track Title:     \(primaryMatch.title)\(isPrimaryLiked ? " ❤️ (Liked Song)" : "")")
         print("  Artist / Info:   \(primaryMatch.subtitle)")
         print("  History Rank:    #\(rank) out of \(allTrackScores.count) unique tracks")
         print()
-        print("  ┌── FORMULA BREAKDOWN ──────────────────────────────────────────────────────")
-        print("  │ 🕒 Play Events (Decayed Sum):    +\(String(format: "%.2f", totalPlayScore)) pts  (\(totalPlays) play\(totalPlays == 1 ? "" : "s") in history)")
+        print("  ┌── ACT-R FORMULA BREAKDOWN ────────────────────────────────────────────────")
+        print("  │ 🕒 Base-Level Activation:        +\(String(format: "%.2f", totalPlayScore)) pts  (\(totalPlays) play\(totalPlays == 1 ? "" : "s") in history)")
         for (pIdx, p) in matchedPlays.enumerated() {
             let timeStr = if p.hoursAgo < 24 {
                 "~\(String(format: "%.1f", p.hoursAgo))h ago"
             } else {
                 "~\(String(format: "%.1f", p.hoursAgo / 24.0))d ago"
             }
-            print("  │    [\(pIdx + 1)] Position #\(p.globalIndex + 1) in History | \(timeStr) | Decay: \(String(format: "%.4f", p.decayWeight)) -> +\(String(format: "%.2f", 25.0 * p.decayWeight)) pts")
+            print("  │    [\(pIdx + 1)] Position #\(p.globalIndex + 1) in History | \(timeStr) | Attention: 1.00 | Decay: \(String(format: "%.4f", p.decayWeight)) -> +\(String(format: "%.2f", 25.0 * p.decayWeight)) pts")
         }
         print("  │")
-        print("  │ 📈 Zajonc Exposure Saturation:   +\(String(format: "%.2f", expBonus)) pts  (Inverted-U for \(totalPlays) plays)")
+        print("  │ ✨ Spreading Activation (Likes):  +\(String(format: "%.2f", spreadingLikedBonus)) pts  (\(isPrimaryLiked ? "Active: +15.0 Intent Permastore" : "Not Liked"))")
+        print("  │ 🗂️ Spreading Activation (Lists):  +0.00 pts  (Not evaluated in CLI)")
         print("  │ 🎤 Artist Affinity Contribution: +\(String(format: "%.2f", artistContribution)) pts  (\(cleanArtist): total \(String(format: "%.1f", artistAffinity)) × 0.4)")
         print("  │ 🚫 Dislike / Skip Penalty:       0.0 pts  (Clean)")
         print("  └───────────────────────────────────────────────────────────────────────────")
-        print("  🏆 FINAL BEHAVIORAL SCORE:         \(String(format: "%.2f", compositeScore)) pts")
+        print("  🏆 FINAL COGNITIVE AFFINITY SCORE: \(String(format: "%.2f", compositeScore)) pts")
         print()
     } catch {
         print("❌ Error auditing score: \(error.localizedDescription)")
