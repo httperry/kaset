@@ -3449,7 +3449,7 @@ func exploreHomeCurate(verbose _: Bool = false) async {
                     let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
 
                     for item in shelf.items {
-                        let hours: Double = if hasKnownBucket {
+                        let hours = if hasKnownBucket {
                             if isToday {
                                 2.0
                             } else if isYesterday {
@@ -3760,9 +3760,9 @@ private func extractCurateExplorerShelves(from data: [String: Any]) -> [CurateEx
     return result
 }
 
-// MARK: - History Explorer
+// MARK: - History & Affinity Score Explorer
 
-func exploreHistory(count: Int = 25, verbose _: Bool = false) async {
+func exploreHistory(count: Int = 25, verbose: Bool = false) async {
     print("📜 Fetching YouTube Music Real-Time Listening History (FEmusic_history)...")
     let hasAuth = loadCookiesFromAppBackup() != nil
     guard hasAuth else {
@@ -3788,16 +3788,90 @@ func exploreHistory(count: Int = 25, verbose _: Bool = false) async {
 
         print("✅ Retrieved \(allItems.count) tracks from YouTube Music watch history\n")
 
+        // Precompute global artist scores and play counts with chronological decay
+        var trackPlayCounts: [String: Int] = [:]
+        var trackDecayedScores: [String: Double] = [:]
+        var artistDecayedScores: [String: Double] = [:]
+        var itemHoursAgo: [Double] = []
+
+        var globalIndex = 0
+        for entry in allItems {
+            let lower = entry.shelfTitle.lowercased()
+            let isToday = lower.contains("today")
+            let isYesterday = lower.contains("yesterday")
+            let isThisWeek = lower.contains("this week") || lower.contains("earlier this week")
+            let isEarlier = lower.contains("earlier") || lower.contains("last week") || lower.contains("last month")
+            let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
+
+            let hours = if hasKnownBucket {
+                if isToday {
+                    2.0
+                } else if isYesterday {
+                    26.0
+                } else if isThisWeek {
+                    96.0
+                } else {
+                    360.0
+                }
+            } else {
+                if globalIndex < 5 {
+                    1.0 + Double(globalIndex) * 0.5
+                } else if globalIndex < 20 {
+                    10.0 + Double(globalIndex - 5) * 1.0
+                } else if globalIndex < 50 {
+                    25.0 + Double(globalIndex - 20) * 2.0
+                } else {
+                    85.0 + Double(globalIndex - 50) * 4.0
+                }
+            }
+            itemHoursAgo.append(hours)
+            globalIndex += 1
+
+            let decay = exp(-0.02 * hours)
+            trackPlayCounts[entry.item.title, default: 0] += 1
+            trackDecayedScores[entry.item.title, default: 0.0] += 25.0 * decay
+            let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
+            artistDecayedScores[cleanArtist, default: 0.0] += 15.0 * decay
+        }
+
         var currentGroup = ""
         for (idx, entry) in allItems.prefix(count).enumerated() {
             if entry.shelfTitle != currentGroup {
                 currentGroup = entry.shelfTitle
                 print("📅 ─── \(currentGroup) ───")
             }
+
+            let hours = itemHoursAgo[idx]
+            let decay = exp(-0.02 * hours)
+            let plays = trackPlayCounts[entry.item.title, default: 1]
+            let trackDecayed = trackDecayedScores[entry.item.title, default: 25.0 * decay]
+            let effectivePlays = trackDecayed / 25.0
+            let effectivePlayCount = Int(effectivePlays.rounded())
+
+            let expBonus: Double = if effectivePlays < 0.1 {
+                0.0
+            } else if effectivePlayCount <= 5 {
+                Double(effectivePlayCount * 15)
+            } else if effectivePlayCount <= 15 {
+                75.0 + Double((effectivePlayCount - 5) * 5)
+            } else {
+                max(20.0, 125.0 - Double((effectivePlayCount - 15) * 3))
+            }
+            let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
+            let artistScore = artistDecayedScores[cleanArtist, default: 0.0]
+            let compositeScore = trackDecayed + expBonus + (artistScore * 0.4)
+
+            let timeStr = if hours < 24 {
+                "~\(String(format: "%.1f", hours))h ago"
+            } else {
+                "~\(String(format: "%.1f", hours / 24.0))d ago"
+            }
+
             print("  [\(idx + 1)] \(entry.item.title)")
-            print("      Artist / Info: \(entry.item.subtitle)")
-            if let thumb = entry.item.thumbnailURL {
-                print("      Thumbnail:     \(thumb)")
+            print("      Artist: \(cleanArtist)")
+            print("      📊 Affinity Score: \(String(format: "%.1f", compositeScore)) pts  [Time: \(timeStr) | Decay: \(String(format: "%.2f", decay)) | Plays: \(plays) | ExpBonus: +\(String(format: "%.0f", expBonus)) | ArtistAffinity: \(String(format: "%.1f", artistScore))]")
+            if verbose, let thumb = entry.item.thumbnailURL {
+                print("      Thumbnail: \(thumb)")
             }
         }
 
@@ -3806,6 +3880,173 @@ func exploreHistory(count: Int = 25, verbose _: Bool = false) async {
         }
     } catch {
         print("❌ Error fetching history: \(error.localizedDescription)")
+    }
+}
+
+func exploreTrackScore(query: String, verbose _: Bool = false) async {
+    print("🔍 Inspecting Behavioral Affinity Score for: \"\(query)\"...")
+    let hasAuth = loadCookiesFromAppBackup() != nil
+    guard hasAuth else {
+        print("❌ Authentication required to compute user affinity score.")
+        print("   Make sure cookies are synced from Kaset app.")
+        return
+    }
+
+    do {
+        let (data, statusCode) = try await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
+        )
+
+        guard statusCode == 200 else {
+            print("❌ HTTP \(statusCode) when fetching history")
+            return
+        }
+
+        let shelves = extractCurateExplorerShelves(from: data)
+        let allItems = shelves.flatMap { shelf in
+            shelf.items.map { (shelfTitle: shelf.title, item: $0) }
+        }
+
+        let lowerQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        struct PlayInstance {
+            let globalIndex: Int
+            let title: String
+            let subtitle: String
+            let hoursAgo: Double
+            let decayWeight: Double
+        }
+
+        var matchedPlays: [PlayInstance] = []
+        var artistDecayedScores: [String: Double] = [:]
+        var allTrackScores: [(title: String, score: Double)] = []
+        var trackPlayCounts: [String: Int] = [:]
+        var trackDecayedScores: [String: Double] = [:]
+
+        var globalIndex = 0
+        for entry in allItems {
+            let lower = entry.shelfTitle.lowercased()
+            let isToday = lower.contains("today")
+            let isYesterday = lower.contains("yesterday")
+            let isThisWeek = lower.contains("this week") || lower.contains("earlier this week")
+            let isEarlier = lower.contains("earlier") || lower.contains("last week") || lower.contains("last month")
+            let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
+
+            let hours = if hasKnownBucket {
+                if isToday {
+                    2.0
+                } else if isYesterday {
+                    26.0
+                } else if isThisWeek {
+                    96.0
+                } else {
+                    360.0
+                }
+            } else {
+                if globalIndex < 5 {
+                    1.0 + Double(globalIndex) * 0.5
+                } else if globalIndex < 20 {
+                    10.0 + Double(globalIndex - 5) * 1.0
+                } else if globalIndex < 50 {
+                    25.0 + Double(globalIndex - 20) * 2.0
+                } else {
+                    85.0 + Double(globalIndex - 50) * 4.0
+                }
+            }
+
+            let decay = exp(-0.02 * hours)
+            let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
+            artistDecayedScores[cleanArtist, default: 0.0] += 15.0 * decay
+            trackPlayCounts[entry.item.title, default: 0] += 1
+            trackDecayedScores[entry.item.title, default: 0.0] += 25.0 * decay
+
+            let itemTitleLower = entry.item.title.lowercased()
+            let itemSubLower = entry.item.subtitle.lowercased()
+            if itemTitleLower.contains(lowerQuery) || itemSubLower.contains(lowerQuery) {
+                matchedPlays.append(PlayInstance(
+                    globalIndex: globalIndex,
+                    title: entry.item.title,
+                    subtitle: entry.item.subtitle,
+                    hoursAgo: hours,
+                    decayWeight: decay
+                ))
+            }
+            globalIndex += 1
+        }
+
+        // Rank all tracks in history
+        var seenTitles = Set<String>()
+        for entry in allItems where seenTitles.insert(entry.item.title).inserted {
+            let plays = trackPlayCounts[entry.item.title, default: 1]
+            let expBonus = if plays <= 5 {
+                Double(plays * 15)
+            } else if plays <= 15 {
+                75.0 + Double((plays - 5) * 5)
+            } else {
+                max(20.0, 125.0 - Double((plays - 15) * 3))
+            }
+            let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
+            let artistScore = artistDecayedScores[cleanArtist, default: 0.0]
+            let trackDecayed = trackDecayedScores[entry.item.title, default: 0.0]
+            let score = trackDecayed + expBonus + (artistScore * 0.4)
+            allTrackScores.append((title: entry.item.title, score: score))
+        }
+        allTrackScores.sort { $0.score > $1.score }
+
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("🧠 BEHAVIORAL AFFINITY AUDIT: \"\(query)\"")
+        print("═══════════════════════════════════════════════════════════════════════════════")
+
+        guard let primaryMatch = matchedPlays.first else {
+            print("⚠️ No track or artist matching \"\(query)\" found in your recent watch history.")
+            print("   Affinity Score: 0.0 pts (Unlistened)")
+            return
+        }
+
+        let cleanArtist = primaryMatch.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? primaryMatch.subtitle
+        let totalPlays = matchedPlays.count
+        let totalPlayScore = matchedPlays.reduce(0.0) { $0 + (25.0 * $1.decayWeight) }
+        let effectivePlays = totalPlayScore / 25.0
+        let effectivePlayCount = Int(effectivePlays.rounded())
+
+        let expBonus: Double = if effectivePlays < 0.1 {
+            0.0
+        } else if effectivePlayCount <= 5 {
+            Double(effectivePlayCount * 15)
+        } else if effectivePlayCount <= 15 {
+            75.0 + Double((effectivePlayCount - 5) * 5)
+        } else {
+            max(20.0, 125.0 - Double((effectivePlayCount - 15) * 3))
+        }
+        let artistAffinity = artistDecayedScores[cleanArtist, default: 0.0]
+        let artistContribution = artistAffinity * 0.4
+        let compositeScore = totalPlayScore + expBonus + artistContribution
+
+        let rank = (allTrackScores.firstIndex(where: { $0.title.lowercased() == primaryMatch.title.lowercased() }) ?? 0) + 1
+
+        print("  Track Title:     \(primaryMatch.title)")
+        print("  Artist / Info:   \(primaryMatch.subtitle)")
+        print("  History Rank:    #\(rank) out of \(allTrackScores.count) unique tracks")
+        print()
+        print("  ┌── FORMULA BREAKDOWN ──────────────────────────────────────────────────────")
+        print("  │ 🕒 Play Events (Decayed Sum):    +\(String(format: "%.2f", totalPlayScore)) pts  (\(totalPlays) play\(totalPlays == 1 ? "" : "s") in history)")
+        for (pIdx, p) in matchedPlays.enumerated() {
+            let timeStr = if p.hoursAgo < 24 {
+                "~\(String(format: "%.1f", p.hoursAgo))h ago"
+            } else {
+                "~\(String(format: "%.1f", p.hoursAgo / 24.0))d ago"
+            }
+            print("  │    [\(pIdx + 1)] Position #\(p.globalIndex + 1) in History | \(timeStr) | Decay: \(String(format: "%.4f", p.decayWeight)) -> +\(String(format: "%.2f", 25.0 * p.decayWeight)) pts")
+        }
+        print("  │")
+        print("  │ 📈 Zajonc Exposure Saturation:   +\(String(format: "%.2f", expBonus)) pts  (Inverted-U for \(totalPlays) plays)")
+        print("  │ 🎤 Artist Affinity Contribution: +\(String(format: "%.2f", artistContribution)) pts  (\(cleanArtist): total \(String(format: "%.1f", artistAffinity)) × 0.4)")
+        print("  │ 🚫 Dislike / Skip Penalty:       0.0 pts  (Clean)")
+        print("  └───────────────────────────────────────────────────────────────────────────")
+        print("  🏆 FINAL BEHAVIORAL SCORE:         \(String(format: "%.2f", compositeScore)) pts")
+        print()
+    } catch {
+        print("❌ Error auditing score: \(error.localizedDescription)")
     }
 }
 
@@ -3835,7 +4076,8 @@ func showHelp() {
           analyze-file <path>            Safely summarize a saved JSON response
           list                           List all known endpoints
           auth                           Check authentication status
-          history [count]                View your real-time YouTube Music listening history
+          history [count]                View your real-time YouTube Music listening history with affinity scores
+          score <query>                  Audit the exact behavioral affinity breakdown and score for a song
           accounts                       Discover available accounts (via authuser)
           brandaccounts                  List all brand accounts with their IDs
           ytcfg [url]                    Probe an HTTPS YouTube page's ytcfg identity
@@ -4285,6 +4527,15 @@ func runMain() async {
     case "history":
         let count = filteredArgs.count >= 2 ? (Int(filteredArgs[1]) ?? 25) : 25
         await exploreHistory(count: count, verbose: verbose)
+
+    case "score":
+        guard filteredArgs.count >= 2 else {
+            print("❌ Usage: score <song title, artist, or query>")
+            print("   Example: swift run api-explorer score \"90210\"")
+            return
+        }
+        let query = filteredArgs.dropFirst().joined(separator: " ")
+        await exploreTrackScore(query: query, verbose: verbose)
 
     case "home-curate":
         await exploreHomeCurate(verbose: verbose)

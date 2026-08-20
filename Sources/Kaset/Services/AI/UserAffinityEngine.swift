@@ -371,20 +371,23 @@ final class UserAffinityEngine {
         // 2. Play events with exponential temporal decay
         if let videoId {
             let timestamps = self.profile.playTimestamps[videoId] ?? []
+            var effectivePlays = 0.0
             if timestamps.isEmpty, let count = self.profile.trackPlayCounts[videoId], count > 0 {
                 // Fallback for untimestamped history: evaluate with flat conservative weight
                 compositeScore += Double(count) * 10.0
+                effectivePlays = Double(count)
             } else {
                 for date in timestamps {
                     let hours = max(0, referenceDate.timeIntervalSince(date) / 3600.0)
                     let decay = Self.temporalDecayWeight(elapsedHours: hours)
                     compositeScore += 25.0 * decay
+                    effectivePlays += decay
                 }
             }
 
-            // 3. Exposure saturation curve (Zajonc mere-exposure with Wundt satiation)
-            let totalPlays = self.profile.trackPlayCounts[videoId] ?? timestamps.count
-            compositeScore += Self.exposureBonus(playCount: totalPlays)
+            // 3. Exposure saturation curve (Zajonc mere-exposure with Wundt satiation on active decayed plays)
+            let expBonus = Self.exposureBonus(playCount: Int(effectivePlays.rounded()))
+            compositeScore += expBonus
 
             // 4. Like bonus (+40)
             if self.profile.likedVideoIDs.contains(videoId) {
@@ -429,7 +432,7 @@ final class UserAffinityEngine {
             let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
 
             for item in section.items {
-                let hourOffset: Double = if hasKnownBucket {
+                let hourOffset = if hasKnownBucket {
                     if isToday {
                         2.0
                     } else if isYesterday {
