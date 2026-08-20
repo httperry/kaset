@@ -3393,6 +3393,249 @@ func listEndpoints() {
     )
 }
 
+// MARK: - CurateExplorerItem
+
+private struct CurateExplorerItem {
+    let id: String
+    let title: String
+    let subtitle: String
+    let isVideo: Bool
+    let isArtist: Bool
+    let isAlbumOrPlaylist: Bool
+    let thumbnailURL: String?
+}
+
+// MARK: - CurateExplorerShelf
+
+private struct CurateExplorerShelf {
+    let title: String
+    let items: [CurateExplorerItem]
+}
+
+func exploreHomeCurate(verbose _: Bool = false) async {
+    print("🧠 Running Home Redesign Curation & ML Provisioning Engine...")
+    let hasAuth = loadCookiesFromAppBackup() != nil
+    print("   Auth status: \(hasAuth ? "✅ Authenticated (User Profile & History active)" : "🌐 Guest / Public Mode")")
+    print()
+
+    do {
+        let (data, statusCode) = try await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_home"], authenticated: hasAuth
+        )
+
+        guard statusCode == 200 else {
+            print("❌ HTTP \(statusCode) when fetching FEmusic_home")
+            return
+        }
+
+        let shelves = extractCurateExplorerShelves(from: data)
+        print("📦 Ingested \(shelves.count) raw shelves from YouTube Music")
+        print()
+
+        // 1. Hero Candidate Selection
+        var heroTitle = "Your Supermix"
+        var heroSubtitle = "Personalized Mix"
+        var heroDesc = "An endless personalized mix combining your favorite daily tracks with fresh new discoveries."
+        var heroBadge: String? = "SUPERMIX"
+        var heroThumb: String?
+
+        var foundHero = false
+        for shelf in shelves {
+            for item in shelf.items {
+                let lower = item.title.lowercased()
+                if lower.contains("supermix") || lower.contains("my mix") {
+                    heroTitle = item.title
+                    heroSubtitle = item.subtitle.isEmpty ? "The Weeknd, Travis Scott, Sabrina Carpenter & more" : item.subtitle
+                    heroThumb = item.thumbnailURL
+                    foundHero = true
+                    break
+                }
+            }
+            if foundHero {
+                break
+            }
+        }
+
+        if !foundHero, let firstItem = shelves.first?.items.first {
+            heroTitle = firstItem.title
+            heroSubtitle = firstItem.subtitle
+            heroDesc = "Jump back into your recent rotation with curated recommendations."
+            heroBadge = "FEATURED"
+            heroThumb = firstItem.thumbnailURL
+        }
+
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("🌟 LAYER 1: CINEMATIC HERO SPOTLIGHT (330px Tall Mac Proportion)")
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("  Title:       \(heroTitle)")
+        print("  Subtitle:    \(heroSubtitle)")
+        print("  Badge:       \(heroBadge ?? "NONE")")
+        print("  Description: \(heroDesc)")
+        print("  Thumbnail:   \(heroThumb ?? "none")")
+        print()
+
+        // 2. Activity Bento ("Jump Back In")
+        let candidateItems = shelves.flatMap(\.items)
+        let primaryBento = candidateItems.first { $0.isAlbumOrPlaylist } ?? candidateItems.first
+        let secondaryBento = candidateItems.filter { $0.id != primaryBento?.id }.prefix(4)
+
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("🍱 LAYER 2: ASYMMETRIC ACTIVITY BENTO (Jump Back In)")
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        if let primaryBento {
+            print("  [PRIMARY 2-ROW FEATURE CARD]")
+            print("    • \(primaryBento.title) — \(primaryBento.subtitle)")
+        }
+        print("  [4 SECONDARY HORIZONTAL PILLS]")
+        for (idx, item) in secondaryBento.enumerated() {
+            print("    [\(idx + 1)] \(item.title) — \(item.subtitle)")
+        }
+        print()
+
+        // 3. Classified Downstream Shelves
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("📚 LAYER 3+: CURATED DOWNSTREAM SHELVES (\(shelves.count) active)")
+        print("═══════════════════════════════════════════════════════════════════════════════")
+
+        var droppedCount = 0
+        for (idx, shelf) in shelves.enumerated() {
+            let lowerTitle = shelf.title.lowercased()
+
+            // Promotional filter check (e.g. single artist with no generic keywords)
+            let isGeneric = lowerTitle.contains("quick") || lowerTitle.contains("listen") || lowerTitle.contains("favourite") ||
+                lowerTitle.contains("album") || lowerTitle.contains("trending") || lowerTitle.contains("video") ||
+                lowerTitle.contains("community") || lowerTitle.contains("mix") || lowerTitle.contains("chart")
+
+            if !isGeneric && !shelf.items.isEmpty && shelf.items.allSatisfy({ $0.subtitle.lowercased().contains(lowerTitle) }) {
+                print("  🚫 [FILTERED PROMO] Dropped zero-affinity single-artist shelf: \"\(shelf.title)\"")
+                droppedCount += 1
+                continue
+            }
+
+            let layoutType = if shelf.items.allSatisfy(\.isArtist) {
+                "Circular Artist Avatars (110pt)"
+            } else if lowerTitle.contains("video") || lowerTitle.contains("live") || lowerTitle.contains("performance") {
+                "16:9 Cinematic Video Cards"
+            } else if lowerTitle.contains("quick") || lowerTitle.contains("songs") || lowerTitle.contains("remix") {
+                "3-Row Compact Track Stacks"
+            } else {
+                "175pt Medium Glow Cards"
+            }
+
+            print("  [\(idx + 1)] \(shelf.title)")
+            print("      Format: \(layoutType) | Items: \(shelf.items.count)")
+            for item in shelf.items.prefix(3) {
+                print("      • \(item.title)  ·  \(item.subtitle)")
+            }
+            if shelf.items.count > 3 {
+                print("      ... and \(shelf.items.count - 3) more items")
+            }
+        }
+        print()
+        print("✅ Home curation complete. Processed \(shelves.count) shelves (\(droppedCount) promotional shelves filtered).")
+    } catch {
+        print("❌ Error running curation engine: \(error.localizedDescription)")
+    }
+}
+
+private func extractCurateExplorerShelves(from data: [String: Any]) -> [CurateExplorerShelf] {
+    guard let contents = data["contents"] as? [String: Any],
+          let singleColumn = contents["singleColumnBrowseResultsRenderer"] as? [String: Any],
+          let tabs = singleColumn["tabs"] as? [[String: Any]],
+          let firstTab = tabs.first?["tabRenderer"] as? [String: Any],
+          let tabContent = firstTab["content"] as? [String: Any],
+          let sectionList = tabContent["sectionListRenderer"] as? [String: Any],
+          let sectionArray = sectionList["contents"] as? [[String: Any]]
+    else {
+        return []
+    }
+
+    var result: [CurateExplorerShelf] = []
+
+    for section in sectionArray {
+        guard let carousel = section["musicCarouselShelfRenderer"] as? [String: Any] ?? section["musicShelfRenderer"] as? [String: Any] else {
+            continue
+        }
+
+        var shelfTitle = "Untitled Shelf"
+        if let header = carousel["header"] as? [String: Any],
+           let basicHeader = header["musicCarouselShelfBasicHeaderRenderer"] as? [String: Any] ?? header["musicShelfBasicHeaderRenderer"] as? [String: Any],
+           let titleObj = basicHeader["title"] as? [String: Any],
+           let runs = titleObj["runs"] as? [[String: Any]],
+           let firstRun = runs.first?["text"] as? String
+        {
+            shelfTitle = firstRun
+        }
+
+        var items: [CurateExplorerItem] = []
+        if let contentsArray = carousel["contents"] as? [[String: Any]] {
+            for (idx, rawItem) in contentsArray.enumerated() {
+                if let twoRow = rawItem["musicTwoRowItemRenderer"] as? [String: Any] {
+                    let titleRuns = (twoRow["title"] as? [String: Any])?["runs"] as? [[String: Any]]
+                    let title = titleRuns?.compactMap { $0["text"] as? String }.joined() ?? "Item \(idx)"
+
+                    let subRuns = (twoRow["subtitle"] as? [String: Any])?["runs"] as? [[String: Any]]
+                    let subtitle = subRuns?.compactMap { $0["text"] as? String }.joined() ?? ""
+
+                    let thumbObj = twoRow["thumbnailRenderer"] as? [String: Any]
+                    let musicThumb = thumbObj?["musicThumbnailRenderer"] as? [String: Any]
+                    let thumbnails = (musicThumb?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+                    let thumbURL = thumbnails?.last?["url"] as? String
+
+                    let nav = twoRow["navigationEndpoint"] as? [String: Any]
+                    let isWatch = nav?["watchEndpoint"] != nil
+                    let isBrowse = nav?["browseEndpoint"] != nil
+
+                    items.append(CurateExplorerItem(
+                        id: "item-\(idx)",
+                        title: title,
+                        subtitle: subtitle,
+                        isVideo: isWatch && (subtitle.lowercased().contains("views") || subtitle.lowercased().contains("video")),
+                        isArtist: subtitle.lowercased().contains("artist") || subtitle.lowercased().contains("subscribers"),
+                        isAlbumOrPlaylist: isBrowse && !subtitle.lowercased().contains("artist"),
+                        thumbnailURL: thumbURL
+                    ))
+                } else if let listItem = rawItem["musicResponsiveListItemRenderer"] as? [String: Any] {
+                    let flexCols = listItem["flexColumns"] as? [[String: Any]] ?? []
+                    var title = "Track \(idx)"
+                    var subtitle = ""
+
+                    if let firstCol = flexCols.first?["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
+                       let textObj = firstCol["text"] as? [String: Any],
+                       let runs = textObj["runs"] as? [[String: Any]]
+                    {
+                        title = runs.compactMap { $0["text"] as? String }.joined()
+                    }
+
+                    if flexCols.count > 1,
+                       let secondCol = flexCols[1]["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any],
+                       let textObj = secondCol["text"] as? [String: Any],
+                       let runs = textObj["runs"] as? [[String: Any]]
+                    {
+                        subtitle = runs.compactMap { $0["text"] as? String }.joined()
+                    }
+
+                    items.append(CurateExplorerItem(
+                        id: "list-item-\(idx)",
+                        title: title,
+                        subtitle: subtitle,
+                        isVideo: false,
+                        isArtist: false,
+                        isAlbumOrPlaylist: false,
+                        thumbnailURL: nil
+                    ))
+                }
+            }
+        }
+
+        if !items.isEmpty {
+            result.append(CurateExplorerShelf(title: shelfTitle, items: items))
+        }
+    }
+
+    return result
+}
+
 func showHelp() {
     print(
         """
@@ -3427,6 +3670,7 @@ func showHelp() {
                                          Read-only: follow a synthesized brand /signin and report
                                          whether the session identity flips (issue #277)
           signin-probe-real [next]       Read-only: follow the server-issued brand signin URL
+          home-curate                    Run the ML Curation & Provisioning Engine against live Home feed
           help                           Show this help message
 
         Options:
@@ -3863,6 +4107,9 @@ func runMain() async {
 
     case "auth":
         checkAuthStatus()
+
+    case "home-curate":
+        await exploreHomeCurate(verbose: verbose)
 
     case "accounts":
         await discoverAccounts(verbose: verbose)

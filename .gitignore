@@ -3,6 +3,8 @@
 .agents/
 .shreakter.json
 projectdata/
+test_ui/
+
 
 # Build artifacts
 .build/

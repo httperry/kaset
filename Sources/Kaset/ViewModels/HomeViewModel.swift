@@ -12,6 +12,9 @@ final class HomeViewModel {
     /// Home sections to display.
     private(set) var sections: [HomeSection] = []
 
+    /// Curated Home content payload (Hero, Activity Bento, and classified shelves).
+    private(set) var provisionedContent: HomeProvisionedContent?
+
     /// Whether more sections are available to load.
     private(set) var hasMoreSections: Bool = true
 
@@ -71,6 +74,7 @@ final class HomeViewModel {
             let response = try await client.getHome(forceRefresh: forceRefresh)
             guard generation == self.loadGeneration else { return }
             self.sections = response.sections
+            self.provisionedContent = HomeContentEngine.process(rawSections: self.sections)
             self.hasMoreSections = self.client.hasMoreHomeSections
             self.loadingState = .loaded
             let sectionCount = self.sections.count
@@ -114,6 +118,8 @@ final class HomeViewModel {
             if let additionalSections = try await client.getHomeContinuation() {
                 guard generation == self.loadGeneration else { return }
                 self.sections.append(contentsOf: additionalSections)
+                // Refresh curated content with new continuation sections
+                self.provisionedContent = HomeContentEngine.process(rawSections: self.sections)
                 self.hasMoreSections = self.client.hasMoreHomeSections
                 self.logger.info("Loaded \(additionalSections.count) more home sections on demand")
             } else {
