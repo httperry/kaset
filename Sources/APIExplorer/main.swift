@@ -3642,6 +3642,11 @@ private func extractCurateExplorerShelves(from data: [String: Any]) -> [CurateEx
                         subtitle = runs.compactMap { $0["text"] as? String }.joined()
                     }
 
+                    let thumbObj = listItem["thumbnail"] as? [String: Any]
+                    let musicThumb = thumbObj?["musicThumbnailRenderer"] as? [String: Any]
+                    let thumbnails = (musicThumb?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]
+                    let thumbURL = thumbnails?.last?["url"] as? String
+
                     items.append(CurateExplorerItem(
                         id: "list-item-\(idx)",
                         title: title,
@@ -3649,7 +3654,7 @@ private func extractCurateExplorerShelves(from data: [String: Any]) -> [CurateEx
                         isVideo: false,
                         isArtist: false,
                         isAlbumOrPlaylist: false,
-                        thumbnailURL: nil
+                        thumbnailURL: thumbURL
                     ))
                 }
             }
@@ -3661,6 +3666,55 @@ private func extractCurateExplorerShelves(from data: [String: Any]) -> [CurateEx
     }
 
     return result
+}
+
+// MARK: - History Explorer
+
+func exploreHistory(count: Int = 25, verbose _: Bool = false) async {
+    print("📜 Fetching YouTube Music Real-Time Listening History (FEmusic_history)...")
+    let hasAuth = loadCookiesFromAppBackup() != nil
+    guard hasAuth else {
+        print("❌ Authentication required to fetch history.")
+        print("   Make sure cookies are synced from Kaset app.")
+        return
+    }
+
+    do {
+        let (data, statusCode) = try await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
+        )
+
+        guard statusCode == 200 else {
+            print("❌ HTTP \(statusCode) when fetching history")
+            return
+        }
+
+        let shelves = extractCurateExplorerShelves(from: data)
+        let allItems = shelves.flatMap { shelf in
+            shelf.items.map { (shelfTitle: shelf.title, item: $0) }
+        }
+
+        print("✅ Retrieved \(allItems.count) tracks from YouTube Music watch history\n")
+
+        var currentGroup = ""
+        for (idx, entry) in allItems.prefix(count).enumerated() {
+            if entry.shelfTitle != currentGroup {
+                currentGroup = entry.shelfTitle
+                print("📅 ─── \(currentGroup) ───")
+            }
+            print("  [\(idx + 1)] \(entry.item.title)")
+            print("      Artist / Info: \(entry.item.subtitle)")
+            if let thumb = entry.item.thumbnailURL {
+                print("      Thumbnail:     \(thumb)")
+            }
+        }
+
+        if allItems.count > count {
+            print("\n  ... and \(allItems.count - count) more history items available (pass higher count to view)")
+        }
+    } catch {
+        print("❌ Error fetching history: \(error.localizedDescription)")
+    }
 }
 
 func showHelp() {
@@ -3689,6 +3743,7 @@ func showHelp() {
           analyze-file <path>            Safely summarize a saved JSON response
           list                           List all known endpoints
           auth                           Check authentication status
+          history [count]                View your real-time YouTube Music listening history
           accounts                       Discover available accounts (via authuser)
           brandaccounts                  List all brand accounts with their IDs
           ytcfg [url]                    Probe an HTTPS YouTube page's ytcfg identity
@@ -4134,6 +4189,10 @@ func runMain() async {
 
     case "auth":
         checkAuthStatus()
+
+    case "history":
+        let count = filteredArgs.count >= 2 ? (Int(filteredArgs[1]) ?? 25) : 25
+        await exploreHistory(count: count, verbose: verbose)
 
     case "home-curate":
         await exploreHomeCurate(verbose: verbose)
