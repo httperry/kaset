@@ -4089,6 +4089,276 @@ func exploreTrackScore(query: String, verbose _: Bool = false) async {
     }
 }
 
+func exploreArtists(count: Int = 20, verbose _: Bool = false) async {
+    print("🎤 Inspecting Curated Artists & ACT-R Affinity Leaderboard...")
+    let hasAuth = loadCookiesFromAppBackup() != nil
+    guard hasAuth else {
+        print("❌ Authentication required to fetch history & liked tracks.")
+        print("   Make sure cookies are synced from Kaset app.")
+        return
+    }
+
+    do {
+        let (data, statusCode) = try await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
+        )
+        guard statusCode == 200 else {
+            print("❌ HTTP \(statusCode) when fetching history")
+            return
+        }
+
+        var likedSongTitles: Set<String> = []
+        if let (likedData, likedStatus) = try? await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_liked_videos"], authenticated: true
+        ), likedStatus == 200 {
+            likedSongTitles = extractLikedSongTitles(from: likedData)
+        }
+
+        let shelves = extractCurateExplorerShelves(from: data)
+        let allItems = shelves.flatMap { shelf in
+            shelf.items.map { (shelfTitle: shelf.title, item: $0) }
+        }
+
+        struct ArtistStats {
+            var name: String
+            var playCount: Int = 0
+            var likedCount: Int = 0
+            var baseActivationScore: Double = 0.0
+            var recentTracks: [String] = []
+            var lastListenedHours: Double = .infinity
+        }
+
+        var artistMap: [String: ArtistStats] = [:]
+        var globalIndex = 0
+
+        for entry in allItems {
+            let lower = entry.shelfTitle.lowercased()
+            let isToday = lower.contains("today")
+            let isYesterday = lower.contains("yesterday")
+            let isThisWeek = lower.contains("this week") || lower.contains("earlier this week")
+            let isEarlier = lower.contains("earlier") || lower.contains("last week") || lower.contains("last month")
+            let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
+
+            let hours = if hasKnownBucket {
+                if isToday {
+                    2.0
+                } else if isYesterday {
+                    26.0
+                } else if isThisWeek {
+                    96.0
+                } else {
+                    360.0
+                }
+            } else {
+                if globalIndex < 5 {
+                    1.0 + Double(globalIndex) * 0.5
+                } else if globalIndex < 20 {
+                    10.0 + Double(globalIndex - 5) * 1.0
+                } else if globalIndex < 50 {
+                    25.0 + Double(globalIndex - 20) * 2.0
+                } else {
+                    85.0 + Double(globalIndex - 50) * 4.0
+                }
+            }
+            globalIndex += 1
+
+            let hoursClamped = max(0.1, hours)
+            let decay = pow(hoursClamped, -0.5) // ACT-R decay d = 0.5
+            let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
+            guard !cleanArtist.isEmpty else { continue }
+
+            var stats = artistMap[cleanArtist, default: ArtistStats(name: cleanArtist)]
+            stats.playCount += 1
+            stats.baseActivationScore += 15.0 * decay
+            if !stats.recentTracks.contains(entry.item.title), stats.recentTracks.count < 3 {
+                stats.recentTracks.append(entry.item.title)
+            }
+            stats.lastListenedHours = min(stats.lastListenedHours, hours)
+
+            let isLiked = likedSongTitles.contains(entry.item.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+            if isLiked {
+                stats.likedCount += 1
+            }
+
+            artistMap[cleanArtist] = stats
+        }
+
+        var sortedArtists = artistMap.values.map { stats -> (stats: ArtistStats, totalScore: Double) in
+            let score = stats.baseActivationScore + Double(stats.likedCount * 20)
+            return (stats: stats, totalScore: score)
+        }
+        sortedArtists.sort { $0.totalScore > $1.totalScore }
+
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("🎤 TOP CURATED ARTISTS (Ranked by ACT-R Cognitive Affinity)")
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("  Found \(sortedArtists.count) unique artists in recent listening universe\n")
+
+        for (idx, item) in sortedArtists.prefix(count).enumerated() {
+            let stats = item.stats
+            let score = item.totalScore
+            let timeStr = if stats.lastListenedHours < 24 {
+                "~\(String(format: "%.1f", stats.lastListenedHours))h ago"
+            } else {
+                "~\(String(format: "%.1f", stats.lastListenedHours / 24.0))d ago"
+            }
+
+            let tier = if score >= 40.0 {
+                "🔥 HEAVY ROTATION"
+            } else if score >= 15.0 {
+                "⭐ FREQUENT"
+            } else {
+                "🎧 CASUAL"
+            }
+
+            print("  [\(idx + 1)] \(stats.name)")
+            print("      📊 Affinity Score: \(String(format: "%.1f", score)) pts  [\(tier)]")
+            print("      🕒 Plays: \(stats.playCount) | Last Heard: \(timeStr) | ❤️ Liked Tracks: \(stats.likedCount)")
+            if !stats.recentTracks.isEmpty {
+                print("      🎵 Recent Tracks: \(stats.recentTracks.joined(separator: " · "))")
+            }
+            print()
+        }
+    } catch {
+        print("❌ Error fetching artists: \(error.localizedDescription)")
+    }
+}
+
+func exploreArtistScore(query: String, verbose _: Bool = false) async {
+    print("🔍 Inspecting Behavioral Affinity Breakdown for Artist: \"\(query)\"...")
+    let hasAuth = loadCookiesFromAppBackup() != nil
+    guard hasAuth else {
+        print("❌ Authentication required.")
+        return
+    }
+
+    do {
+        let (data, statusCode) = try await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_history"], authenticated: true
+        )
+        guard statusCode == 200 else {
+            print("❌ HTTP \(statusCode) when fetching history")
+            return
+        }
+
+        var likedSongTitles: Set<String> = []
+        if let (likedData, likedStatus) = try? await makeRequest(
+            endpoint: "browse", body: ["browseId": "FEmusic_liked_videos"], authenticated: true
+        ), likedStatus == 200 {
+            likedSongTitles = extractLikedSongTitles(from: likedData)
+        }
+
+        let shelves = extractCurateExplorerShelves(from: data)
+        let allItems = shelves.flatMap { shelf in
+            shelf.items.map { (shelfTitle: shelf.title, item: $0) }
+        }
+
+        let lowerQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        struct ArtistTrackPlay {
+            let title: String
+            let hoursAgo: Double
+            let decay: Double
+            let isLiked: Bool
+            let pts: Double
+        }
+
+        var matchedArtistName = ""
+        var plays: [ArtistTrackPlay] = []
+        var globalIndex = 0
+
+        for entry in allItems {
+            let lower = entry.shelfTitle.lowercased()
+            let isToday = lower.contains("today")
+            let isYesterday = lower.contains("yesterday")
+            let isThisWeek = lower.contains("this week") || lower.contains("earlier this week")
+            let isEarlier = lower.contains("earlier") || lower.contains("last week") || lower.contains("last month")
+            let hasKnownBucket = isToday || isYesterday || isThisWeek || isEarlier
+
+            let hours = if hasKnownBucket {
+                if isToday {
+                    2.0
+                } else if isYesterday {
+                    26.0
+                } else if isThisWeek {
+                    96.0
+                } else {
+                    360.0
+                }
+            } else {
+                if globalIndex < 5 {
+                    1.0 + Double(globalIndex) * 0.5
+                } else if globalIndex < 20 {
+                    10.0 + Double(globalIndex - 5) * 1.0
+                } else if globalIndex < 50 {
+                    25.0 + Double(globalIndex - 20) * 2.0
+                } else {
+                    85.0 + Double(globalIndex - 50) * 4.0
+                }
+            }
+            globalIndex += 1
+
+            let cleanArtist = entry.item.subtitle.components(separatedBy: "•").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? entry.item.subtitle
+            if cleanArtist.lowercased().contains(lowerQuery) || lowerQuery.contains(cleanArtist.lowercased()) {
+                matchedArtistName = cleanArtist
+                let hoursClamped = max(0.1, hours)
+                let decay = pow(hoursClamped, -0.5)
+                let isLiked = likedSongTitles.contains(entry.item.title.lowercased().trimmingCharacters(in: .whitespacesAndNewlines))
+                plays.append(ArtistTrackPlay(
+                    title: entry.item.title,
+                    hoursAgo: hours,
+                    decay: decay,
+                    isLiked: isLiked,
+                    pts: 15.0 * decay
+                ))
+            }
+        }
+
+        guard !plays.isEmpty else {
+            print("⚠️ No artist matching \"\(query)\" found in your recent watch history.")
+            print("   Affinity Score: 0.0 pts")
+            print("   Promotional Status: 🚫 A single-artist shelf for this artist will be FILTERED & DROPPED.")
+            return
+        }
+
+        let baseActivation = plays.reduce(0.0) { $0 + $1.pts }
+        let likedCount = plays.filter(\.isLiked).count
+        let likedBonus = Double(likedCount * 20)
+        let totalArtistScore = baseActivation + likedBonus
+        let trackContribution = totalArtistScore * 0.4
+
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("🧠 ARTIST BEHAVIORAL AFFINITY AUDIT: \"\(matchedArtistName)\"")
+        print("═══════════════════════════════════════════════════════════════════════════════")
+        print("  Artist Name:       \(matchedArtistName)")
+        print("  Total Plays:       \(plays.count) in recent history")
+        print("  Liked Tracks:      \(likedCount)")
+        print()
+        print("  ┌── ACT-R ARTIST FORMULA BREAKDOWN ─────────────────────────────────────────")
+        print("  │ 🕒 Base-Level Activation (Decayed Track Plays): +\(String(format: "%.2f", baseActivation)) pts")
+        for (idx, p) in plays.enumerated() {
+            let timeStr = if p.hoursAgo < 24 {
+                "~\(String(format: "%.1f", p.hoursAgo))h ago"
+            } else {
+                "~\(String(format: "%.1f", p.hoursAgo / 24.0))d ago"
+            }
+            let likeMarker = p.isLiked ? " ❤️" : ""
+            print("  │    [\(idx + 1)] \"\(p.title)\"\(likeMarker) | \(timeStr) | Decay: \(String(format: "%.4f", p.decay)) -> +\(String(format: "%.2f", p.pts)) pts")
+        }
+        print("  │")
+        print("  │ ❤️ Likes Bonus:                   +\(String(format: "%.2f", likedBonus)) pts  (\(likedCount) liked track\(likedCount == 1 ? "" : "s") × 20.0)")
+        print("  │ 🚫 Dislike Status:                Active / Approved (No dislike penalty)")
+        print("  ├───────────────────────────────────────────────────────────────────────────")
+        print("  │ 🏆 TOTAL ARTIST AFFINITY SCORE:   \(String(format: "%.2f", totalArtistScore)) pts")
+        print("  │ 🚀 Track Score Boost (+40%):      +\(String(format: "%.2f", trackContribution)) pts to every track by this artist")
+        print("  │ 🛡️ Promotional Filter:           ✅ PASS (Solo shelves for this artist will be retained)")
+        print("  └───────────────────────────────────────────────────────────────────────────")
+        print()
+    } catch {
+        print("❌ Error auditing artist score: \(error.localizedDescription)")
+    }
+}
+
 func showHelp() {
     print(
         """
@@ -4117,6 +4387,8 @@ func showHelp() {
           auth                           Check authentication status
           history [count]                View your real-time YouTube Music listening history with affinity scores
           score <query>                  Audit the exact behavioral affinity breakdown and score for a song
+          artists [count]                View your top curated artists ranked by ACT-R cognitive affinity
+          artist <name>                  Audit the behavioral affinity breakdown and track boost for an artist
           accounts                       Discover available accounts (via authuser)
           brandaccounts                  List all brand accounts with their IDs
           ytcfg [url]                    Probe an HTTPS YouTube page's ytcfg identity
@@ -4575,6 +4847,19 @@ func runMain() async {
         }
         let query = filteredArgs.dropFirst().joined(separator: " ")
         await exploreTrackScore(query: query, verbose: verbose)
+
+    case "artists":
+        let count = filteredArgs.count >= 2 ? (Int(filteredArgs[1]) ?? 20) : 20
+        await exploreArtists(count: count, verbose: verbose)
+
+    case "artist":
+        guard filteredArgs.count >= 2 else {
+            print("❌ Usage: artist <artist name>")
+            print("   Example: swift run api-explorer artist \"Travis Scott\"")
+            return
+        }
+        let query = filteredArgs.dropFirst().joined(separator: " ")
+        await exploreArtistScore(query: query, verbose: verbose)
 
     case "home-curate":
         await exploreHomeCurate(verbose: verbose)
