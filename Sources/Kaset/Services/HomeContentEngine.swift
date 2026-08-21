@@ -54,62 +54,19 @@ enum HomeContentEngine {
 
     // MARK: - Hero Selection
 
+    private struct ScoredHeroCandidate {
+        let item: HomeSectionItem
+        let score: Double
+        let badgeText: String?
+        let isSupermix: Bool
+    }
+
     /// Selects the top 3 to 5 featured Hero banner items for the Grand Cinematic Stage.
     static func selectHeroItems(
         from sections: [HomeSection],
         affinityEngine: UserAffinityEngine
     ) -> [HomeHeroItemPayload] {
-        struct ScoredHeroCandidate {
-            let item: HomeSectionItem
-            let score: Double
-            let badgeText: String
-            let isSupermix: Bool
-        }
-
-        var candidates: [ScoredHeroCandidate] = []
-
-        // 1. Check for "Your Supermix" or "My Mix" in raw sections
-        for section in sections {
-            for item in section.items {
-                let lowerTitle = item.title.lowercased()
-                if lowerTitle.contains("supermix") || lowerTitle.contains("my mix") {
-                    candidates.append(ScoredHeroCandidate(
-                        item: item,
-                        score: 180.0,
-                        badgeText: "SUPERMIX",
-                        isSupermix: true
-                    ))
-                }
-            }
-        }
-
-        // 2. Score all valid items across sections
-        let allItems = sections.flatMap(\.items)
-        for item in allItems {
-            let score = affinityEngine.computeAffinityScore(
-                videoId: item.videoId,
-                artist: item.subtitle,
-                albumId: item.album?.id
-            )
-            // Negative score means disliked/suppressed
-            guard score >= 0 else { continue }
-
-            let badge = if score >= 40.0 {
-                "HEAVY ROTATION"
-            } else if item.album != nil {
-                "FEATURED ALBUM"
-            } else {
-                "FOR YOU"
-            }
-
-            candidates.append(ScoredHeroCandidate(
-                item: item,
-                score: score,
-                badgeText: badge,
-                isSupermix: false
-            ))
-        }
-
+        let candidates = Self.scoreHeroCandidates(from: sections, affinityEngine: affinityEngine)
         guard !candidates.isEmpty else { return [] }
 
         // Deduplicate candidates by item ID
@@ -137,12 +94,15 @@ enum HomeContentEngine {
 
         return elitePool.map { candidate in
             let item = candidate.item
-            let artistSummary = Self.extractTopArtistsSummary(from: [item])
-            let editorialDesc = affinityEngine.generateHeroEditorialDescription(
-                title: item.title,
-                artistSummary: artistSummary.isEmpty ? (item.subtitle ?? "") : artistSummary
-            )
-            let artistCover = Self.findArtistCoverURL(for: item, in: sections)
+            let artistInfo = Self.findFeaturedArtistInfo(for: item, in: sections)
+
+            let editorialDesc: String? = if candidate.isSupermix {
+                "Continuous personalized mix based on your listening habits."
+            } else if let album = item.album, let year = album.year {
+                "Album • Released in \(year)"
+            } else {
+                nil
+            }
 
             return HomeHeroItemPayload(
                 id: item.id,
@@ -150,7 +110,8 @@ enum HomeContentEngine {
                 artistSubtitle: item.subtitle ?? "Personalized Selection",
                 editorialDescription: editorialDesc,
                 thumbnailURL: item.thumbnailURL,
-                artistCoverURL: artistCover,
+                artistCoverURL: artistInfo.coverURL,
+                featuredArtistId: artistInfo.artistId,
                 badgeText: candidate.badgeText,
                 playTarget: Self.makePlayTarget(from: item)
             )
@@ -163,6 +124,67 @@ enum HomeContentEngine {
         affinityEngine: UserAffinityEngine
     ) -> HomeHeroItemPayload? {
         self.selectHeroItems(from: sections, affinityEngine: affinityEngine).first
+    }
+
+    private static func scoreHeroCandidates(
+        from sections: [HomeSection],
+        affinityEngine: UserAffinityEngine
+    ) -> [ScoredHeroCandidate] {
+        var candidates: [ScoredHeroCandidate] = []
+
+        // 1. Check for personalized Supermix / My Mix
+        for section in sections {
+            for item in section.items {
+                let lowerTitle = item.title.lowercased()
+                if lowerTitle.contains("supermix") || lowerTitle.contains("my mix") {
+                    let score = affinityEngine.computeAffinityScore(
+                        videoId: item.videoId,
+                        artist: item.subtitle,
+                        albumId: item.album?.id
+                    )
+                    guard score >= 0 else { continue }
+                    candidates.append(ScoredHeroCandidate(
+                        item: item,
+                        score: score,
+                        badgeText: "SUPERMIX",
+                        isSupermix: true
+                    ))
+                }
+            }
+        }
+
+        // 2. Score items across all sections strictly using the psychological composite formula
+        for section in sections {
+            if affinityEngine.isPromotionalShelf(title: section.title, items: section.items) {
+                continue
+            }
+
+            for item in section.items {
+                let score = affinityEngine.computeAffinityScore(
+                    videoId: item.videoId,
+                    artist: item.subtitle,
+                    albumId: item.album?.id
+                )
+                guard score >= 0 else { continue }
+
+                let badge: String? = if score >= 60.0 {
+                    "HEAVY ROTATION"
+                } else if item.album != nil {
+                    "ALBUM"
+                } else {
+                    nil
+                }
+
+                candidates.append(ScoredHeroCandidate(
+                    item: item,
+                    score: score,
+                    badgeText: badge,
+                    isSupermix: false
+                ))
+            }
+        }
+
+        return candidates
     }
 
     // MARK: - Jump Back In Selection
@@ -186,9 +208,12 @@ enum HomeContentEngine {
             candidateItems = sections.flatMap(\.items)
         }
 
-        // Filter out disliked items and deduplicate
+        // Filter out disliked items, video view items, and deduplicate
         var seenIDs = Set<String>()
         var uniqueCandidates = candidateItems.filter { item in
+            if let subtitle = item.subtitle?.lowercased(), subtitle.contains("views") {
+                return false
+            }
             let score = affinityEngine.computeAffinityScore(videoId: item.videoId, artist: item.subtitle, albumId: item.album?.id)
             guard score >= 0 else { return false }
             return seenIDs.insert(item.id).inserted
@@ -340,34 +365,49 @@ enum HomeContentEngine {
 
     // MARK: - Helper Methods
 
-    private static func findArtistCoverURL(
+    private static func findFeaturedArtistInfo(
         for item: HomeSectionItem,
         in sections: [HomeSection]
-    ) -> URL? {
-        // 1. If the item is a song, its video ID provides a true 16:9 YouTube high-res thumbnail!
-        if case let .song(song) = item, !song.videoId.isEmpty {
-            return URL(string: "https://i.ytimg.com/vi/\(song.videoId)/hqdefault.jpg")
-        }
-
-        // 2. If the item itself is an artist, use its high-res thumbnail
+    ) -> (artistId: String?, coverURL: URL?) {
+        // 1. Direct artist item
         if case let .artist(artist) = item {
-            return artist.thumbnailURL?.highQualityThumbnailURL
+            return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
         }
 
-        // 3. Scan the feed for matching artist photography
-        let targetArtistName = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        // 2. Song with navigable artist
+        if case let .song(song) = item, let artist = song.artists.first(where: { $0.hasNavigableId }) {
+            return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+        }
 
+        // 3. Album with navigable artist
+        if case let .album(album) = item, let artist = album.artists?.first(where: { $0.hasNavigableId }) {
+            return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+        }
+
+        // 4. Playlist or general item: match artist from subtitle in home sections
+        let targetArtistName = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         for section in sections {
             for sectionItem in section.items {
                 if case let .artist(artist) = sectionItem {
-                    if let name = targetArtistName, !name.isEmpty, artist.name.lowercased() == name, let url = artist.thumbnailURL {
-                        return url.highQualityThumbnailURL
+                    if let name = targetArtistName, !name.isEmpty,
+                       artist.name.lowercased() == name || name.contains(artist.name.lowercased())
+                    {
+                        return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
                     }
                 }
             }
         }
 
-        return nil
+        // 5. Fallback: Find the first prominent artist in the home feed sections
+        for section in sections {
+            for sectionItem in section.items {
+                if case let .artist(artist) = sectionItem, artist.hasNavigableId {
+                    return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+                }
+            }
+        }
+
+        return (nil, nil)
     }
 
     private static func makePlayTarget(from item: HomeSectionItem) -> HomePlayTarget {

@@ -90,15 +90,19 @@ struct HomeView: View {
                 }
 
                 if let provisioned = self.viewModel.provisionedContent, !provisioned.isEmpty {
-                    // Layer 1: Grand 16:9 Cinematic Hero Spotlight Stage
+                    // Layer 1: Grand Cinematic Hero Spotlight Stage
                     if !provisioned.heroItems.isEmpty {
                         HomeHeroSpotlightView(
                             heroItems: provisioned.heroItems,
+                            onFetchArtistBanner: { artistId in
+                                try? await self.viewModel.client.getArtist(id: artistId).thumbnailURL
+                            },
                             onPlayTarget: { self.playTarget($0) },
                             onNavigateTarget: { self.navigateTarget($0) },
                             onNavigateArtist: { self.navigationPath.append($0) }
                         )
                         .padding(.horizontal, DetailContentLayout.horizontalInset)
+                        .staggeredAppearance(index: 1)
                     }
 
                     // Layer 2: "Jump Back In" Recent Rotation Shelf (8 Items)
@@ -116,6 +120,7 @@ struct HomeView: View {
                             },
                             contentInset: DetailContentLayout.horizontalInset
                         )
+                        .staggeredAppearance(index: 2)
                     }
 
                     // Layer 3+: Classified Curated Downstream Shelves
@@ -293,8 +298,19 @@ struct HomeView: View {
     private func navigateTarget(_ target: HomePlayTarget) {
         switch target {
         case let .song(song):
-            // CLICKING A SONG PLAYS THE SONG!
-            Task { await self.playerService.playWithRadio(song: song) }
+            if let albumId = song.album?.id, !albumId.isEmpty {
+                let playlist = Playlist(
+                    id: albumId,
+                    title: song.album?.title ?? song.title,
+                    description: nil,
+                    thumbnailURL: song.thumbnailURL,
+                    trackCount: nil,
+                    author: song.artists.first
+                )
+                self.navigationPath.append(playlist)
+            } else if let artist = song.artists.first, artist.hasNavigableId {
+                self.navigationPath.append(artist)
+            }
         case let .album(album):
             let playlist = Playlist(
                 id: album.id,

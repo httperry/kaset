@@ -66,6 +66,7 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
     let editorialDescription: String?
     let thumbnailURL: URL?
     let artistCoverURL: URL?
+    let featuredArtistId: String?
     let badgeText: String?
     let playTarget: HomePlayTarget
 
@@ -76,6 +77,7 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
         editorialDescription: String? = nil,
         thumbnailURL: URL? = nil,
         artistCoverURL: URL? = nil,
+        featuredArtistId: String? = nil,
         badgeText: String? = nil,
         playTarget: HomePlayTarget
     ) {
@@ -85,6 +87,7 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
         self.editorialDescription = editorialDescription
         self.thumbnailURL = thumbnailURL
         self.artistCoverURL = artistCoverURL
+        self.featuredArtistId = featuredArtistId
         self.badgeText = badgeText
         self.playTarget = playTarget
     }
