@@ -2,15 +2,15 @@
 //  HomeHeroSpotlightView.swift
 //  Kaset
 //
-//  Grand 475pt Cinematic Hero Spotlight Stage with Spotify-style 16:9 artist
-//  cover image backdrop, dynamic color mesh, and Liquid Glass controls.
+//  Grand 520pt Cinematic Hero Spotlight Stage with Spotify-style 16:9 artist
+//  cover backdrop, smart ambient mesh fallback, and Liquid Glass controls.
 //
 
 import SwiftUI
 
 // MARK: - HomeHeroSpotlightView
 
-/// Grand 475pt Cinematic Featured Spotlight Stage with 16:9 artist backdrop and multi-item carousel.
+/// Grand 520pt Cinematic Featured Spotlight Stage with 16:9 artist backdrop and multi-item carousel.
 struct HomeHeroSpotlightView: View {
     let heroItems: [HomeHeroItemPayload]
     let onPlayTarget: (HomePlayTarget) -> Void
@@ -21,8 +21,8 @@ struct HomeHeroSpotlightView: View {
     @State private var palette: ColorExtractor.ColorPalette = .default
     @State private var isHovering = false
 
-    private static let bannerHeight: CGFloat = 475
-    private static let artworkSize: CGFloat = 255
+    private static let bannerHeight: CGFloat = 520
+    private static let artworkSize: CGFloat = 280
 
     private var currentItem: HomeHeroItemPayload? {
         guard !self.heroItems.isEmpty else { return nil }
@@ -36,8 +36,12 @@ struct HomeHeroSpotlightView: View {
                 // Layer 1: Dark Canvas Base
                 Color(nsColor: NSColor(white: 0.05, alpha: 1.0))
 
-                // Layer 2: 16:9 Artist Cover Image on the Right (or ambient blurred backdrop)
-                self.backdropMediaLayer(for: currentItem)
+                // Layer 2: Dynamic Backdrop (16:9 Artist Photography or Dreamy Blurred Backdrop)
+                if currentItem.artistCoverURL != nil {
+                    self.artistCoverBackdrop(for: currentItem)
+                } else {
+                    self.blurredMeshBackdrop(for: currentItem)
+                }
 
                 // Layer 3: Dynamic Ambient Color Mesh Gradient
                 self.colorMeshLayer
@@ -47,7 +51,7 @@ struct HomeHeroSpotlightView: View {
 
                 // Layer 5: Foreground Hero Stage Content
                 HStack(alignment: .bottom, spacing: 36) {
-                    // Left 255x255 3D Artwork Box
+                    // Left 280x280 3D Artwork Box
                     self.artworkView(for: currentItem)
 
                     // Right Details & Action Bar
@@ -65,12 +69,12 @@ struct HomeHeroSpotlightView: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: Self.bannerHeight)
-            .clipShape(.rect(cornerRadius: 24))
+            .clipShape(.rect(cornerRadius: 26))
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 26)
                     .strokeBorder(.white.opacity(0.14), lineWidth: 1)
             )
-            .contentShape(.rect(cornerRadius: 24))
+            .contentShape(.rect(cornerRadius: 26))
             .onHover { hovering in
                 withAnimation(AppAnimation.quick) {
                     self.isHovering = hovering
@@ -86,61 +90,91 @@ struct HomeHeroSpotlightView: View {
         }
     }
 
-    // MARK: - Backdrop Media (16:9 Cover or Ambient Lush Artwork)
+    // MARK: - 16:9 Artist Cover Backdrop (Spotify Style)
 
-    @ViewBuilder
-    private func backdropMediaLayer(for item: HomeHeroItemPayload) -> some View {
-        if let coverURL = item.artistCoverURL {
-            // Widescreen 16:9 Artist / Video Imagery on the Right
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
+    private func artistCoverBackdrop(for item: HomeHeroItemPayload) -> some View {
+        let imageURL = item.artistCoverURL ?? item.thumbnailURL?.highQualityThumbnailURL
 
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            ZStack {
+                if let url = imageURL {
+                    CachedAsyncImage(
+                        url: url,
+                        targetSize: CGSize(width: 960, height: 540)
+                    ) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 760, height: Self.bannerHeight)
+                            .clipped()
+                    } placeholder: {
+                        EmptyView()
+                    }
+                }
+            }
+            .frame(width: 760, height: Self.bannerHeight)
+            // Spotify-style smooth horizontal fade mask: transparent on left, solid on right
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: .black.opacity(0.20), location: 0.20),
+                        .init(color: .black.opacity(0.75), location: 0.55),
+                        .init(color: .black, location: 0.85),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .opacity(0.75)
+        }
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Dreamy Blurred Mesh Backdrop (For Playlists/Collages)
+
+    private func blurredMeshBackdrop(for item: HomeHeroItemPayload) -> some View {
+        ZStack {
+            if let url = item.thumbnailURL?.highQualityThumbnailURL {
                 CachedAsyncImage(
-                    url: coverURL,
-                    targetSize: CGSize(width: 960, height: 540)
+                    url: url,
+                    targetSize: CGSize(width: 600, height: 600)
                 ) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 760, height: Self.bannerHeight)
-                        .clipped()
+                        .scaleEffect(1.4)
+                        .blur(radius: 75)
+                        .opacity(0.45)
                 } placeholder: {
                     EmptyView()
                 }
-                .frame(width: 760, height: Self.bannerHeight)
-                // Spotify-style horizontal fade mask: transparent on left, solid on right
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.0),
-                            .init(color: .black.opacity(0.15), location: 0.20),
-                            .init(color: .black.opacity(0.70), location: 0.50),
-                            .init(color: .black, location: 0.82),
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
+            }
+
+            // Atmospheric glass aura on the right
+            HStack {
+                Spacer()
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                self.palette.secondary.opacity(0.40),
+                                self.palette.primary.opacity(0.15),
+                                .clear,
+                            ],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 220
+                        )
                     )
-                )
-                .opacity(0.75)
+                    .frame(width: 440, height: 440)
+                    .blur(radius: 40)
+                    .offset(x: 80, y: -20)
             }
-            .allowsHitTesting(false)
-        } else if let thumbURL = item.thumbnailURL?.highQualityThumbnailURL {
-            // Ambient full-bleed blurred backdrop for user playlists
-            CachedAsyncImage(
-                url: thumbURL,
-                targetSize: CGSize(width: 600, height: 600)
-            ) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .scaleEffect(1.4)
-                    .blur(radius: 65)
-                    .opacity(0.40)
-            } placeholder: {
-                EmptyView()
-            }
-            .allowsHitTesting(false)
         }
+        .allowsHitTesting(false)
     }
 
     // MARK: - Color Mesh Layer
@@ -149,7 +183,7 @@ struct HomeHeroSpotlightView: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    self.palette.primary.opacity(0.65),
+                    self.palette.primary.opacity(0.60),
                     self.palette.secondary.opacity(0.35),
                     Color(nsColor: NSColor(white: 0.04, alpha: 0.95)),
                 ],
@@ -160,10 +194,10 @@ struct HomeHeroSpotlightView: View {
             RadialGradient(
                 colors: [
                     self.palette.primary.opacity(0.75),
-                    self.palette.primary.opacity(0.15),
+                    self.palette.primary.opacity(0.18),
                     .clear,
                 ],
-                center: .init(x: 0.16, y: 0.70),
+                center: .init(x: 0.18, y: 0.70),
                 startRadius: 20,
                 endRadius: 400
             )
@@ -180,7 +214,7 @@ struct HomeHeroSpotlightView: View {
                 stops: [
                     .init(color: .black.opacity(0.88), location: 0.0),
                     .init(color: .black.opacity(0.65), location: 0.45),
-                    .init(color: .clear, location: 0.85),
+                    .init(color: .clear, location: 0.82),
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -190,7 +224,7 @@ struct HomeHeroSpotlightView: View {
             LinearGradient(
                 colors: [
                     .clear,
-                    .black.opacity(0.30),
+                    .black.opacity(0.25),
                     .black.opacity(0.80),
                 ],
                 startPoint: .top,
@@ -200,7 +234,7 @@ struct HomeHeroSpotlightView: View {
         .allowsHitTesting(false)
     }
 
-    // MARK: - Artwork View (Left 3D Box)
+    // MARK: - Artwork View (Left Box)
 
     private func artworkView(for item: HomeHeroItemPayload) -> some View {
         Button {
@@ -221,7 +255,7 @@ struct HomeHeroSpotlightView: View {
                             .fill(self.palette.primary.opacity(0.35))
                             .overlay {
                                 Image(systemName: "music.note")
-                                    .font(.system(size: 60))
+                                    .font(.system(size: 64))
                                     .foregroundStyle(.white.opacity(0.7))
                             }
                     }
@@ -230,7 +264,7 @@ struct HomeHeroSpotlightView: View {
                         .fill(self.palette.primary.opacity(0.35))
                         .overlay {
                             Image(systemName: "music.note")
-                                .font(.system(size: 60))
+                                .font(.system(size: 64))
                                 .foregroundStyle(.white.opacity(0.7))
                         }
                 }
@@ -249,13 +283,13 @@ struct HomeHeroSpotlightView: View {
                     .animation(AppAnimation.quick, value: self.isHovering)
             }
             .frame(width: Self.artworkSize, height: Self.artworkSize)
-            .clipShape(.rect(cornerRadius: 20))
+            .clipShape(.rect(cornerRadius: 22))
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 22)
                     .strokeBorder(.white.opacity(0.24), lineWidth: 1.5)
             )
-            .shadow(color: self.palette.primary.opacity(0.60), radius: 54, x: 0, y: 18)
-            .shadow(color: .black.opacity(0.45), radius: 20, x: 0, y: 8)
+            .shadow(color: self.palette.primary.opacity(0.65), radius: 56, x: 0, y: 18)
+            .shadow(color: .black.opacity(0.45), radius: 22, x: 0, y: 10)
             .scaleEffect(self.isHovering ? 1.02 : 1.0)
             .animation(AppAnimation.spring, value: self.isHovering)
         }
@@ -286,7 +320,7 @@ struct HomeHeroSpotlightView: View {
                 self.onPlayTarget(item.playTarget)
             } label: {
                 Text(item.title)
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
+                    .font(.system(size: 44, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -336,7 +370,7 @@ struct HomeHeroSpotlightView: View {
                         Text("Start Listening")
                             .font(.system(size: 14, weight: .semibold))
                     }
-                    .padding(.horizontal, 22)
+                    .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                 }
                 .compatGlassProminentButton()
