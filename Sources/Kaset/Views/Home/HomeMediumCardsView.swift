@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - HomeMediumCardsView
 
-/// 175pt Medium Card Carousel with ambient shadow and Liquid Glass play hover overlay.
+/// 175pt Medium Card Carousel with ambient shadow and contextual Liquid Glass play hover overlay.
 struct HomeMediumCardsView: View {
     let title: String
     let items: [HomeSectionItem]
@@ -51,6 +51,19 @@ private struct HomeMediumCardItemView: View {
     private static let cardWidth: CGFloat = 175
     private static let artworkSize: CGFloat = 175
 
+    private var isQuickPlayable: Bool {
+        switch self.item {
+        case .song:
+            true
+        case .album:
+            true
+        case let .playlist(playlist):
+            SongActionsHelper.canQuickPlayPlaylist(playlist)
+        case .artist:
+            false
+        }
+    }
+
     var body: some View {
         Button(action: self.onNavigate) {
             VStack(alignment: .leading, spacing: 8) {
@@ -83,8 +96,8 @@ private struct HomeMediumCardItemView: View {
                             }
                     }
 
-                    // Hover Liquid Glass Play Button
-                    if self.isHovering {
+                    // Hover Liquid Glass Play Button (only for playable items)
+                    if self.isQuickPlayable, self.isHovering {
                         Button(action: self.onPlay) {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 16, weight: .bold))
@@ -92,7 +105,7 @@ private struct HomeMediumCardItemView: View {
                                 .offset(x: 1.5)
                                 .frame(width: 44, height: 44)
                                 .compatGlass(interactive: true, in: .circle)
-                                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 3)
+                                .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 3)
                         }
                         .buttonStyle(.plain)
                         .transition(.scale(scale: 0.85).combined(with: .opacity))
@@ -105,10 +118,10 @@ private struct HomeMediumCardItemView: View {
                         .strokeBorder(.white.opacity(0.12), lineWidth: 1)
                 )
                 .shadow(
-                    color: self.isHovering ? .black.opacity(0.24) : .black.opacity(0.12),
-                    radius: self.isHovering ? 14 : 8,
+                    color: self.isHovering ? .black.opacity(0.24) : .black.opacity(0.10),
+                    radius: self.isHovering ? 14 : 6,
                     x: 0,
-                    y: self.isHovering ? 6 : 3
+                    y: self.isHovering ? 6 : 2
                 )
 
                 // Title & Subtitle

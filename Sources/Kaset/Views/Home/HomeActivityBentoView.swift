@@ -14,18 +14,36 @@ struct HomeActivityBentoView: View {
     let bentoPayload: HomeBentoItemPayload
     let onPlayItem: (HomeSectionItem) -> Void
     let onNavigateItem: (HomeSectionItem) -> Void
+    var onViewMore: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             // Section Header
             HStack(spacing: 8) {
+                // Leading Icon
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.tint)
+
                 Text("Jump Back In")
                     .font(.title2)
                     .fontWeight(.semibold)
 
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.secondary)
+                Spacer()
+
+                // Trailing "See All" Button
+                if let onViewMore {
+                    Button(action: onViewMore) {
+                        HStack(spacing: 4) {
+                            Text("See All")
+                                .font(.system(size: 13, weight: .medium))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             // Asymmetric Bento Layout
@@ -48,12 +66,12 @@ struct HomeActivityBentoView: View {
             self.onNavigateItem(item)
         } label: {
             HStack(spacing: 16) {
-                // Artwork Box with Hover Play Overlay
+                // Artwork Box
                 ZStack {
                     if let url = item.thumbnailURL {
                         CachedAsyncImage(
                             url: url,
-                            targetSize: CGSize(width: 130, height: 130)
+                            targetSize: CGSize(width: 136, height: 136)
                         ) { image in
                             image
                                 .resizable()
@@ -77,13 +95,13 @@ struct HomeActivityBentoView: View {
                             }
                     }
                 }
-                .frame(width: 130, height: 130)
+                .frame(width: 136, height: 136)
                 .clipShape(.rect(cornerRadius: 12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(.white.opacity(0.12), lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 3)
+                .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 4)
 
                 // Text Details
                 VStack(alignment: .leading, spacing: 6) {
@@ -120,7 +138,7 @@ struct HomeActivityBentoView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(14)
-            .frame(width: 340, height: 162)
+            .frame(width: 350, height: 164)
             .compatGlass(interactive: true, in: .rect(cornerRadius: 16))
         }
         .buttonStyle(.plain)
@@ -153,7 +171,7 @@ struct HomeActivityBentoView: View {
                     if let url = item.thumbnailURL {
                         CachedAsyncImage(
                             url: url,
-                            targetSize: CGSize(width: 52, height: 52)
+                            targetSize: CGSize(width: 54, height: 54)
                         ) { image in
                             image
                                 .resizable()
@@ -177,7 +195,7 @@ struct HomeActivityBentoView: View {
                             }
                     }
                 }
-                .frame(width: 52, height: 52)
+                .frame(width: 54, height: 54)
                 .clipShape(.rect(cornerRadius: 8))
 
                 // Text
@@ -211,7 +229,7 @@ struct HomeActivityBentoView: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity)
-            .frame(height: 75)
+            .frame(height: 76)
             .compatGlass(interactive: true, in: .rect(cornerRadius: 12))
         }
         .buttonStyle(.plain)

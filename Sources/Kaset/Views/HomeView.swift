@@ -7,6 +7,7 @@ struct HomeView: View {
     @Environment(FavoritesManager.self) private var favoritesManager
     @Environment(SongLikeStatusManager.self) private var likeStatusManager
     @Environment(AuthService.self) private var authService
+    @Environment(AccountService.self) private var accountService
     @State private var navigationPath = NavigationPath()
     @State private var networkMonitor = NetworkMonitor.shared
 
@@ -67,7 +68,10 @@ struct HomeView: View {
 
     private var contentView: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 32) {
+            LazyVStack(alignment: .leading, spacing: 28) {
+                // Top Personalized Greeting
+                self.homeHeaderView
+
                 // Favorites section (hidden when empty)
                 if self.authService.hasPersonalAccount, self.favoritesManager.isVisible {
                     FavoritesSection(
@@ -86,7 +90,7 @@ struct HomeView: View {
                 }
 
                 if let provisioned = self.viewModel.provisionedContent, !provisioned.isEmpty {
-                    // Layer 1: Cinematic Hero Spotlight Banner
+                    // Layer 1: Grand Cinematic Hero Spotlight Banner
                     if let hero = provisioned.heroItem {
                         HomeHeroSpotlightView(
                             heroItem: hero,
@@ -102,7 +106,10 @@ struct HomeView: View {
                         HomeActivityBentoView(
                             bentoPayload: bento,
                             onPlayItem: { self.playSectionItem($0) },
-                            onNavigateItem: { self.navigateSectionItem($0) }
+                            onNavigateItem: { self.navigateSectionItem($0) },
+                            onViewMore: {
+                                // Navigate to user library / history
+                            }
                         )
                         .padding(.horizontal, DetailContentLayout.horizontalInset)
                         .staggeredAppearance(index: 2)
@@ -127,17 +134,45 @@ struct HomeView: View {
                     self.loadMoreControl
                 }
             }
-            // The ScrollView fills the detail column edge-to-edge so shelves
-            // scroll under the floating glass sidebar; each shelf restores a
-            // resting inset via `contentInset`. Only the vertical inset stays
-            // on the stack.
             .padding(.top, 4)
-            .padding(.bottom, 20)
+            .padding(.bottom, 24)
         }
         .accessibilityIdentifier(AccessibilityID.Home.scrollView)
         .pullToRefresh {
             await self.viewModel.refresh()
         }
+    }
+
+    // MARK: - Header Greeting
+
+    private var homeHeaderView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(self.greetingTitle)
+                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+
+            Text("Here's your personalized mix and listening highlights")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, DetailContentLayout.horizontalInset)
+        .padding(.top, 4)
+    }
+
+    private var greetingTitle: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let timeGreeting = if hour >= 5, hour < 12 {
+            String(localized: "Good morning")
+        } else if hour >= 12, hour < 17 {
+            String(localized: "Good afternoon")
+        } else {
+            String(localized: "Good evening")
+        }
+
+        if let firstName = self.accountService.currentAccount?.name.components(separatedBy: " ").first, !firstName.isEmpty {
+            return "\(timeGreeting), \(firstName)"
+        }
+        return timeGreeting
     }
 
     // MARK: - Curated Shelves
@@ -520,5 +555,6 @@ struct HomeView: View {
     HomeView(viewModel: HomeViewModel(client: client))
         .environment(PlayerService())
         .environment(authService)
+        .environment(AccountService(ytMusicClient: client, authService: authService))
         .environment(FavoritesManager.shared)
 }
