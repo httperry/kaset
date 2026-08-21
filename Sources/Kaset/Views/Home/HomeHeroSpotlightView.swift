@@ -32,7 +32,7 @@ struct HomeHeroSpotlightView: View {
 
     var body: some View {
         if let currentItem {
-            ZStack(alignment: .bottomLeading) {
+            ZStack(alignment: .leading) {
                 // Layer 1: Dark Canvas Base
                 Color(nsColor: NSColor(white: 0.05, alpha: 1.0))
 
@@ -49,18 +49,19 @@ struct HomeHeroSpotlightView: View {
                 // Layer 4: Vignettes for Maximum Text Legibility & Contrast
                 self.vignetteLayer
 
-                // Layer 5: Foreground Hero Stage Content
-                HStack(alignment: .bottom, spacing: 36) {
+                // Layer 5: Foreground Hero Stage Content (Vertically Centered)
+                HStack(alignment: .center, spacing: 36) {
                     // Left 280x280 3D Artwork Box
                     self.artworkView(for: currentItem)
 
                     // Right Details & Action Bar
                     self.detailsView(for: currentItem)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 38)
+                .padding(.horizontal, 44)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
                 // Layer 6: Carousel Controls (Next/Prev and Dots)
                 if self.heroItems.count > 1 {
@@ -299,7 +300,7 @@ struct HomeHeroSpotlightView: View {
     // MARK: - Details & Action Buttons
 
     private func detailsView(for item: HomeHeroItemPayload) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             // Badge Pill
             if let badgeText = item.badgeText, !badgeText.isEmpty {
                 HStack(spacing: 6) {
@@ -320,7 +321,7 @@ struct HomeHeroSpotlightView: View {
                 self.onPlayTarget(item.playTarget)
             } label: {
                 Text(item.title)
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -334,14 +335,14 @@ struct HomeHeroSpotlightView: View {
                     self.onNavigateArtist(artist)
                 } label: {
                     Text(item.artistSubtitle)
-                        .font(.system(size: 20, weight: .medium))
+                        .font(.system(size: 18, weight: .medium))
                         .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
             } else {
                 Text(item.artistSubtitle)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white.opacity(0.92))
                     .lineLimit(1)
             }
@@ -349,29 +350,25 @@ struct HomeHeroSpotlightView: View {
             // Contextual Narrative
             if let editorial = item.editorialDescription, !editorial.isEmpty {
                 Text(editorial)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13.5))
                     .foregroundStyle(.white.opacity(0.75))
                     .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer()
-                .frame(height: 8)
-
             // Action Row
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 // Primary Play Action
                 Button {
                     self.onPlayTarget(item.playTarget)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "play.fill")
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                         Text("Start Listening")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13.5, weight: .semibold))
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 10)
                 }
                 .compatGlassProminentButton()
                 .tint(.white)
@@ -384,17 +381,18 @@ struct HomeHeroSpotlightView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                         Text("View Details")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 13.5, weight: .medium))
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
                     .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
                 .compatGlass(interactive: true, in: .capsule)
             }
+            .padding(.top, 4)
         }
     }
 

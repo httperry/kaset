@@ -99,7 +99,6 @@ struct HomeView: View {
                             onNavigateArtist: { self.navigationPath.append($0) }
                         )
                         .padding(.horizontal, DetailContentLayout.horizontalInset)
-                        .staggeredAppearance(index: 1)
                     }
 
                     // Layer 2: "Jump Back In" Recent Rotation Shelf (8 Items)
@@ -117,7 +116,6 @@ struct HomeView: View {
                             },
                             contentInset: DetailContentLayout.horizontalInset
                         )
-                        .staggeredAppearance(index: 2)
                     }
 
                     // Layer 3+: Classified Curated Downstream Shelves
