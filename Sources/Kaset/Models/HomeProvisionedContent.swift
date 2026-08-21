@@ -41,6 +41,19 @@ enum HomePlayTarget: Equatable, Sendable {
             artist.name
         }
     }
+
+    var artist: Artist? {
+        switch self {
+        case let .song(song):
+            song.artists.first(where: { $0.hasNavigableId })
+        case let .album(album):
+            album.artists?.first(where: { $0.hasNavigableId })
+        case let .playlist(playlist):
+            playlist.author
+        case let .artist(artist):
+            artist
+        }
+    }
 }
 
 // MARK: - HomeHeroItemPayload
@@ -76,20 +89,34 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
 
 // MARK: - HomeBentoItemPayload
 
-/// Data payload for the 2-row asymmetric "Jump Back In" activity bento.
+/// Data payload for the "Jump Back In" recent rotation shelf.
 struct HomeBentoItemPayload: Identifiable, Equatable, Sendable {
     let id: String
-    let primaryItem: HomeSectionItem
-    let secondaryItems: [HomeSectionItem]
+    let items: [HomeSectionItem]
+
+    var primaryItem: HomeSectionItem {
+        self.items.first ?? HomeSectionItem.song(Song(id: "", title: "", artists: [], videoId: ""))
+    }
+
+    var secondaryItems: [HomeSectionItem] {
+        Array(self.items.dropFirst())
+    }
 
     init(
-        id: String = "home-bento-jump-back-in",
+        id: String = "home-jump-back-in",
+        items: [HomeSectionItem]
+    ) {
+        self.id = id
+        self.items = items
+    }
+
+    init(
+        id: String = "home-jump-back-in",
         primaryItem: HomeSectionItem,
         secondaryItems: [HomeSectionItem]
     ) {
         self.id = id
-        self.primaryItem = primaryItem
-        self.secondaryItems = secondaryItems
+        self.items = [primaryItem] + secondaryItems
     }
 }
 
@@ -137,21 +164,32 @@ struct HomeCuratedShelfPayload: Identifiable, Equatable, Sendable {
 
 /// Complete provisioned data payload for the Home screen.
 struct HomeProvisionedContent: Equatable, Sendable {
-    let heroItem: HomeHeroItemPayload?
+    let heroItems: [HomeHeroItemPayload]
     let jumpBackIn: HomeBentoItemPayload?
     let curatedShelves: [HomeCuratedShelfPayload]
 
+    var heroItem: HomeHeroItemPayload? {
+        self.heroItems.first
+    }
+
     init(
+        heroItems: [HomeHeroItemPayload] = [],
         heroItem: HomeHeroItemPayload? = nil,
         jumpBackIn: HomeBentoItemPayload? = nil,
         curatedShelves: [HomeCuratedShelfPayload] = []
     ) {
-        self.heroItem = heroItem
+        if !heroItems.isEmpty {
+            self.heroItems = heroItems
+        } else if let heroItem {
+            self.heroItems = [heroItem]
+        } else {
+            self.heroItems = []
+        }
         self.jumpBackIn = jumpBackIn
         self.curatedShelves = curatedShelves
     }
 
     var isEmpty: Bool {
-        self.heroItem == nil && self.jumpBackIn == nil && self.curatedShelves.isEmpty
+        self.heroItems.isEmpty && self.jumpBackIn == nil && self.curatedShelves.isEmpty
     }
 }

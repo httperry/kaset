@@ -2,93 +2,104 @@
 //  HomeHeroSpotlightView.swift
 //  Kaset
 //
-//  Cinematic 370pt Hero Spotlight Banner with dynamic ambient blurred backdrop,
-//  multi-stop color mesh, glowing 205pt artwork, and Liquid Glass actions.
+//  Grand 410pt 16:9 Cinematic Hero Spotlight Stage with multi-item carousel,
+//  dynamic blurred artwork backdrop, and Liquid Glass controls.
 //
 
 import SwiftUI
 
 // MARK: - HomeHeroSpotlightView
 
-/// Full-width cinematic Hero banner displayed at the top of the Home screen.
+/// Grand 16:9 Cinematic Featured Spotlight Stage with multi-item carousel.
 struct HomeHeroSpotlightView: View {
-    let heroItem: HomeHeroItemPayload
-    let onPlay: () -> Void
-    let onNavigate: () -> Void
+    let heroItems: [HomeHeroItemPayload]
+    let onPlayTarget: (HomePlayTarget) -> Void
+    let onNavigateTarget: (HomePlayTarget) -> Void
+    let onNavigateArtist: (Artist) -> Void
 
+    @State private var selectedIndex: Int = 0
     @State private var palette: ColorExtractor.ColorPalette = .default
     @State private var isHovering = false
 
-    private static let bannerHeight: CGFloat = 370
-    private static let artworkSize: CGFloat = 205
+    private static let bannerHeight: CGFloat = 410
+    private static let artworkSize: CGFloat = 230
 
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Layer 1: Blurred high-res artwork backdrop
-            self.artworkBackdropLayer
-
-            // Layer 2: Dynamic ambient color mesh & radial glow orbs
-            self.colorMeshLayer
-
-            // Layer 3: Right-hand ambient decorative depth (glowing glass aura)
-            self.rightHandDecorativeAura
-
-            // Layer 4: Dark bottom and leading vignettes for crisp contrast
-            self.vignetteLayer
-
-            // Layer 5: Foreground Hero Content
-            HStack(alignment: .bottom, spacing: 32) {
-                // Left Artwork Box
-                self.artworkView
-
-                // Right Details & Action Buttons
-                self.detailsView
-
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 32)
-            .padding(.vertical, 28)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: Self.bannerHeight)
-        .clipShape(.rect(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(.white.opacity(0.14), lineWidth: 1)
-        )
-        .contentShape(.rect(cornerRadius: 24))
-        .onHover { hovering in
-            withAnimation(AppAnimation.quick) {
-                self.isHovering = hovering
-            }
-        }
-        .task(id: self.heroItem.thumbnailURL) {
-            if let url = self.heroItem.thumbnailURL {
-                self.palette = await ColorExtractor.cachedPalette(for: url)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(String(localized: "Featured: \(self.heroItem.title) by \(self.heroItem.artistSubtitle)"))
+    private var currentItem: HomeHeroItemPayload? {
+        guard !self.heroItems.isEmpty else { return nil }
+        let index = min(self.selectedIndex, self.heroItems.count - 1)
+        return self.heroItems[index]
     }
 
-    // MARK: - Background Layers
+    var body: some View {
+        if let currentItem {
+            ZStack(alignment: .bottomLeading) {
+                // Layer 1: Ambient Blurred Artwork Backdrop
+                self.backdropLayer(for: currentItem)
 
-    private var artworkBackdropLayer: some View {
+                // Layer 2: Dynamic Radial Mesh Gradient
+                self.colorMeshLayer
+
+                // Layer 3: Dark Vignettes for Contrast
+                self.vignetteLayer
+
+                // Layer 4: Foreground Hero Stage Content
+                HStack(alignment: .bottom, spacing: 32) {
+                    // Left 230x230 Artwork Box
+                    self.artworkView(for: currentItem)
+
+                    // Right Details & Actions
+                    self.detailsView(for: currentItem)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 36)
+                .padding(.vertical, 34)
+
+                // Layer 5: Carousel Controls (Next/Prev and Dots)
+                if self.heroItems.count > 1 {
+                    self.carouselControls
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.bannerHeight)
+            .clipShape(.rect(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(.white.opacity(0.14), lineWidth: 1)
+            )
+            .contentShape(.rect(cornerRadius: 24))
+            .onHover { hovering in
+                withAnimation(AppAnimation.quick) {
+                    self.isHovering = hovering
+                }
+            }
+            .task(id: currentItem.thumbnailURL) {
+                if let url = currentItem.thumbnailURL {
+                    self.palette = await ColorExtractor.cachedPalette(for: url)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(String(localized: "Featured: \(currentItem.title) by \(currentItem.artistSubtitle)"))
+        }
+    }
+
+    // MARK: - Backdrop Layers
+
+    private func backdropLayer(for item: HomeHeroItemPayload) -> some View {
         ZStack {
-            // Dark base background
-            Color(nsColor: NSColor(white: 0.07, alpha: 1.0))
+            Color(nsColor: NSColor(white: 0.06, alpha: 1.0))
 
-            if let url = self.heroItem.thumbnailURL {
+            if let url = item.thumbnailURL {
                 CachedAsyncImage(
                     url: url,
-                    targetSize: CGSize(width: 480, height: 480)
+                    targetSize: CGSize(width: 600, height: 600)
                 ) { image in
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .scaleEffect(1.3)
-                        .blur(radius: 65)
-                        .opacity(0.40)
+                        .scaleEffect(1.4)
+                        .blur(radius: 70)
+                        .opacity(0.48)
                 } placeholder: {
                     EmptyView()
                 }
@@ -98,83 +109,45 @@ struct HomeHeroSpotlightView: View {
 
     private var colorMeshLayer: some View {
         ZStack {
-            // Diagonal gradient mesh
             LinearGradient(
                 colors: [
-                    self.palette.primary.opacity(0.60),
-                    self.palette.secondary.opacity(0.35),
+                    self.palette.primary.opacity(0.65),
+                    self.palette.secondary.opacity(0.40),
                     Color(nsColor: NSColor(white: 0.04, alpha: 0.95)),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            // Dynamic glow orb positioned behind artwork
             RadialGradient(
                 colors: [
-                    self.palette.primary.opacity(0.70),
+                    self.palette.primary.opacity(0.75),
                     self.palette.primary.opacity(0.20),
                     .clear,
                 ],
-                center: .init(x: 0.20, y: 0.65),
+                center: .init(x: 0.22, y: 0.65),
                 startRadius: 20,
-                endRadius: 280
+                endRadius: 320
             )
-            .allowsHitTesting(false)
-        }
-    }
-
-    private var rightHandDecorativeAura: some View {
-        HStack {
-            Spacer()
-
-            ZStack {
-                // Outer ambient halo
-                Circle()
-                    .strokeBorder(self.palette.primary.opacity(0.12), lineWidth: 2)
-                    .frame(width: 320, height: 320)
-
-                Circle()
-                    .strokeBorder(.white.opacity(0.06), lineWidth: 1.5)
-                    .frame(width: 240, height: 240)
-
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                self.palette.secondary.opacity(0.30),
-                                .clear,
-                            ],
-                            center: .center,
-                            startRadius: 10,
-                            endRadius: 140
-                        )
-                    )
-                    .frame(width: 280, height: 280)
-            }
-            .blur(radius: 20)
-            .offset(x: 60, y: 20)
             .allowsHitTesting(false)
         }
     }
 
     private var vignetteLayer: some View {
         ZStack {
-            // Bottom-to-top vignette for text legibility
             LinearGradient(
                 colors: [
                     .clear,
-                    .black.opacity(0.30),
-                    .black.opacity(0.75),
+                    .black.opacity(0.25),
+                    .black.opacity(0.80),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
-            // Leading-to-trailing subtle dark vignette
             LinearGradient(
                 colors: [
-                    .black.opacity(0.40),
+                    .black.opacity(0.45),
                     .clear,
                 ],
                 startPoint: .leading,
@@ -186,10 +159,13 @@ struct HomeHeroSpotlightView: View {
 
     // MARK: - Artwork View
 
-    private var artworkView: some View {
-        Button(action: self.onNavigate) {
+    private func artworkView(for item: HomeHeroItemPayload) -> some View {
+        Button {
+            // Clicking artwork immediately plays!
+            self.onPlayTarget(item.playTarget)
+        } label: {
             ZStack {
-                if let url = self.heroItem.thumbnailURL {
+                if let url = item.thumbnailURL {
                     CachedAsyncImage(
                         url: url,
                         targetSize: CGSize(width: Self.artworkSize, height: Self.artworkSize)
@@ -202,7 +178,7 @@ struct HomeHeroSpotlightView: View {
                             .fill(self.palette.primary.opacity(0.35))
                             .overlay {
                                 Image(systemName: "music.note")
-                                    .font(.system(size: 48))
+                                    .font(.system(size: 54))
                                     .foregroundStyle(.white.opacity(0.7))
                             }
                     }
@@ -211,101 +187,132 @@ struct HomeHeroSpotlightView: View {
                         .fill(self.palette.primary.opacity(0.35))
                         .overlay {
                             Image(systemName: "music.note")
-                                .font(.system(size: 48))
+                                .font(.system(size: 54))
                                 .foregroundStyle(.white.opacity(0.7))
                         }
                 }
+
+                // Centered Hover Play Icon
+                Circle()
+                    .fill(.black.opacity(self.isHovering ? 0.60 : 0.0))
+                    .frame(width: 58, height: 58)
+                    .overlay {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(.white)
+                            .offset(x: 2)
+                            .opacity(self.isHovering ? 1.0 : 0.0)
+                    }
+                    .animation(AppAnimation.quick, value: self.isHovering)
             }
             .frame(width: Self.artworkSize, height: Self.artworkSize)
-            .clipShape(.rect(cornerRadius: 16))
+            .clipShape(.rect(cornerRadius: 18))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(.white.opacity(0.22), lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 18)
+                    .strokeBorder(.white.opacity(0.24), lineWidth: 1.5)
             )
-            .shadow(color: self.palette.primary.opacity(0.55), radius: 42, x: 0, y: 14)
-            .shadow(color: .black.opacity(0.40), radius: 16, x: 0, y: 8)
+            .shadow(color: self.palette.primary.opacity(0.60), radius: 48, x: 0, y: 16)
+            .shadow(color: .black.opacity(0.45), radius: 18, x: 0, y: 8)
             .scaleEffect(self.isHovering ? 1.02 : 1.0)
             .animation(AppAnimation.spring, value: self.isHovering)
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Details & Actions
+    // MARK: - Details & Action Buttons
 
-    private var detailsView: some View {
+    private func detailsView(for item: HomeHeroItemPayload) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Badge (if present)
-            if let badgeText = self.heroItem.badgeText, !badgeText.isEmpty {
+            // Badge Pill
+            if let badgeText = item.badgeText, !badgeText.isEmpty {
                 HStack(spacing: 5) {
-                    Image(systemName: self.badgeIconName(for: badgeText))
+                    Image(systemName: self.badgeIcon(for: badgeText))
                         .font(.system(size: 10, weight: .bold))
                     Text(badgeText)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .tracking(0.6)
                 }
                 .foregroundStyle(.white.opacity(0.95))
-                .padding(.horizontal, 11)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 5)
                 .compatGlass(interactive: false, in: .capsule)
             }
 
-            // Title
-            Button(action: self.onNavigate) {
-                Text(self.heroItem.title)
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
+            // Big Title
+            Button {
+                self.onPlayTarget(item.playTarget)
+            } label: {
+                Text(item.title)
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                    .shadow(color: .black.opacity(0.5), radius: 6, x: 0, y: 2)
+                    .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
             }
             .buttonStyle(.plain)
 
-            // Artist Subtitle
-            Text(self.heroItem.artistSubtitle)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.white.opacity(0.90))
-                .lineLimit(1)
+            // Artist Subtitle (Clicking artist navigates to artist!)
+            if let artist = item.playTarget.artist {
+                Button {
+                    self.onNavigateArtist(artist)
+                } label: {
+                    Text(item.artistSubtitle)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(item.artistSubtitle)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(1)
+            }
 
-            // Editorial Description
-            if let editorial = self.heroItem.editorialDescription, !editorial.isEmpty {
+            // Contextual Narrative
+            if let editorial = item.editorialDescription, !editorial.isEmpty {
                 Text(editorial)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(.white.opacity(0.70))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
-                .frame(height: 4)
+                .frame(height: 6)
 
             // Action Row
             HStack(spacing: 14) {
-                // Primary Action Button (Start Listening)
-                Button(action: self.onPlay) {
+                // Primary Play Action
+                Button {
+                    self.onPlayTarget(item.playTarget)
+                } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "play.fill")
                             .font(.system(size: 14, weight: .bold))
                         Text("Start Listening")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 13.5, weight: .semibold))
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
                 }
                 .compatGlassProminentButton()
                 .tint(.white)
                 .foregroundStyle(.black)
-                .accessibilityLabel(String(localized: "Start listening to \(self.heroItem.title)"))
+                .accessibilityLabel(String(localized: "Start listening to \(item.title)"))
 
-                // Secondary Action Button (View Details)
-                Button(action: self.onNavigate) {
+                // Secondary View Details Action
+                Button {
+                    self.onNavigateTarget(item.playTarget)
+                } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
                             .font(.system(size: 12, weight: .semibold))
                         Text("View Details")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 13.5, weight: .medium))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
                     .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
@@ -314,7 +321,70 @@ struct HomeHeroSpotlightView: View {
         }
     }
 
-    private func badgeIconName(for text: String) -> String {
+    // MARK: - Carousel Controls
+
+    private var carouselControls: some View {
+        ZStack {
+            // Next / Prev Floating Chevrons
+            HStack {
+                // Prev
+                Button {
+                    withAnimation(AppAnimation.smooth) {
+                        self.selectedIndex = (self.selectedIndex - 1 + self.heroItems.count) % self.heroItems.count
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .compatGlass(interactive: true, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 12)
+                .opacity(self.isHovering ? 1.0 : 0.0)
+
+                Spacer()
+
+                // Next
+                Button {
+                    withAnimation(AppAnimation.smooth) {
+                        self.selectedIndex = (self.selectedIndex + 1) % self.heroItems.count
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 36, height: 36)
+                        .compatGlass(interactive: true, in: .circle)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 12)
+                .opacity(self.isHovering ? 1.0 : 0.0)
+            }
+            .animation(AppAnimation.quick, value: self.isHovering)
+
+            // Bottom Page Dots
+            VStack {
+                Spacer()
+                HStack(spacing: 8) {
+                    ForEach(0 ..< self.heroItems.count, id: \.self) { index in
+                        Circle()
+                            .fill(index == self.selectedIndex ? .white : .white.opacity(0.35))
+                            .frame(width: index == self.selectedIndex ? 8 : 6, height: index == self.selectedIndex ? 8 : 6)
+                            .animation(AppAnimation.quick, value: self.selectedIndex)
+                            .onTapGesture {
+                                withAnimation(AppAnimation.smooth) {
+                                    self.selectedIndex = index
+                                }
+                            }
+                    }
+                }
+                .padding(.bottom, 12)
+            }
+        }
+    }
+
+    private func badgeIcon(for text: String) -> String {
         let lower = text.lowercased()
         if lower.contains("supermix") {
             return "sparkles"

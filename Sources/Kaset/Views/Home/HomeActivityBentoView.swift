@@ -2,25 +2,33 @@
 //  HomeActivityBentoView.swift
 //  Kaset
 //
-//  2-Row Asymmetric Bento Grid for "Jump Back In" (1 feature card + 4 horizontal pills).
+//  "Jump Back In" recent rotation shelf with compact 150pt cards and Liquid Glass actions.
 //
 
 import SwiftUI
 
 // MARK: - HomeActivityBentoView
 
-/// 2-Row Asymmetric Bento Grid displaying recent activity and top rotation ("Jump Back In").
+/// "Jump Back In" Recent Rotation Shelf displaying up to 8 top recent/rotation items.
 struct HomeActivityBentoView: View {
     let bentoPayload: HomeBentoItemPayload
+    let onPlaySong: (Song) -> Void
     let onPlayItem: (HomeSectionItem) -> Void
     let onNavigateItem: (HomeSectionItem) -> Void
+    let onNavigateArtist: (Artist) -> Void
     var onViewMore: (() -> Void)?
+    var contentInset: CGFloat = DetailContentLayout.horizontalInset
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Section Header
+        CarouselShelfSection(
+            accessibilityLabel: String(localized: "Jump Back In"),
+            items: self.bentoPayload.items,
+            id: \.id,
+            itemAlignment: .top,
+            itemSpacing: 16,
+            contentInset: self.contentInset
+        ) {
             HStack(spacing: 8) {
-                // Leading Icon
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.tint)
@@ -31,7 +39,6 @@ struct HomeActivityBentoView: View {
 
                 Spacer()
 
-                // Trailing "See All" Button
                 if let onViewMore {
                     Button(action: onViewMore) {
                         HStack(spacing: 4) {
@@ -45,133 +52,63 @@ struct HomeActivityBentoView: View {
                     .buttonStyle(.plain)
                 }
             }
-
-            // Asymmetric Bento Layout
-            HStack(alignment: .top, spacing: 14) {
-                // Left 2-Row Primary Feature Card
-                self.primaryFeatureCard(self.bentoPayload.primaryItem)
-
-                // Right 4 Pill Cards (2x2 Grid)
-                if !self.bentoPayload.secondaryItems.isEmpty {
-                    self.secondaryPillsGrid(self.bentoPayload.secondaryItems)
+        } itemContent: { item in
+            JumpBackInCardView(
+                item: item,
+                onCardClick: {
+                    switch item {
+                    case let .song(song):
+                        // Clicking song card plays the song!
+                        self.onPlaySong(song)
+                    case .album, .playlist, .artist:
+                        // Clicking album/playlist/artist opens detail view!
+                        self.onNavigateItem(item)
+                    }
+                },
+                onQuickPlay: {
+                    self.onPlayItem(item)
+                },
+                onArtistClick: { artist in
+                    self.onNavigateArtist(artist)
                 }
-            }
+            )
+        }
+    }
+}
+
+// MARK: - JumpBackInCardView
+
+private struct JumpBackInCardView: View {
+    let item: HomeSectionItem
+    let onCardClick: () -> Void
+    let onQuickPlay: () -> Void
+    let onArtistClick: (Artist) -> Void
+
+    @State private var isHovering = false
+
+    private static let cardWidth: CGFloat = 155
+    private static let artworkSize: CGFloat = 155
+
+    private var isQuickPlayable: Bool {
+        switch self.item {
+        case .song, .album:
+            true
+        case let .playlist(playlist):
+            SongActionsHelper.canQuickPlayPlaylist(playlist)
+        case .artist:
+            false
         }
     }
 
-    // MARK: - Primary Feature Card (Spans 2 Rows)
-
-    private func primaryFeatureCard(_ item: HomeSectionItem) -> some View {
-        Button {
-            self.onNavigateItem(item)
-        } label: {
-            HStack(spacing: 16) {
+    var body: some View {
+        Button(action: self.onCardClick) {
+            VStack(alignment: .leading, spacing: 8) {
                 // Artwork Box
                 ZStack {
-                    if let url = item.thumbnailURL {
+                    if let url = self.item.thumbnailURL?.highQualityThumbnailURL {
                         CachedAsyncImage(
                             url: url,
-                            targetSize: CGSize(width: 136, height: 136)
-                        ) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(Color(nsColor: .controlBackgroundColor))
-                                .overlay {
-                                    Image(systemName: "music.note.list")
-                                        .font(.system(size: 32))
-                                        .foregroundStyle(.secondary)
-                                }
-                        }
-                    } else {
-                        Rectangle()
-                            .fill(Color(nsColor: .controlBackgroundColor))
-                            .overlay {
-                                Image(systemName: "music.note.list")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(.secondary)
-                            }
-                    }
-                }
-                .frame(width: 136, height: 136)
-                .clipShape(.rect(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 4)
-
-                // Text Details
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.title)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-
-                    if let subtitle = item.homeCardSubtitle {
-                        Text(subtitle)
-                            .font(.system(size: 13))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-
-                    Spacer()
-
-                    // Quick Play Button
-                    Button {
-                        self.onPlayItem(item)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "play.fill")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("Play")
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                    }
-                    .compatGlassProminentButton()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(14)
-            .frame(width: 350, height: 164)
-            .compatGlass(interactive: true, in: .rect(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(String(localized: "Featured in Jump Back In: \(item.title)"))
-    }
-
-    // MARK: - Secondary Pills (2x2 Grid)
-
-    private func secondaryPillsGrid(_ items: [HomeSectionItem]) -> some View {
-        let columns = [
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12),
-        ]
-
-        return LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(items.prefix(4)) { item in
-                self.pillCard(item)
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func pillCard(_ item: HomeSectionItem) -> some View {
-        Button {
-            self.onNavigateItem(item)
-        } label: {
-            HStack(spacing: 12) {
-                // Artwork
-                ZStack {
-                    if let url = item.thumbnailURL {
-                        CachedAsyncImage(
-                            url: url,
-                            targetSize: CGSize(width: 54, height: 54)
+                            targetSize: CGSize(width: Self.artworkSize, height: Self.artworkSize)
                         ) { image in
                             image
                                 .resizable()
@@ -181,7 +118,7 @@ struct HomeActivityBentoView: View {
                                 .fill(Color(nsColor: .controlBackgroundColor))
                                 .overlay {
                                     Image(systemName: "music.note")
-                                        .font(.system(size: 16))
+                                        .font(.system(size: 32))
                                         .foregroundStyle(.secondary)
                                 }
                         }
@@ -190,48 +127,65 @@ struct HomeActivityBentoView: View {
                             .fill(Color(nsColor: .controlBackgroundColor))
                             .overlay {
                                 Image(systemName: "music.note")
-                                    .font(.system(size: 16))
+                                    .font(.system(size: 32))
                                     .foregroundStyle(.secondary)
                             }
                     }
-                }
-                .frame(width: 54, height: 54)
-                .clipShape(.rect(cornerRadius: 8))
 
-                // Text
+                    // Hover Liquid Glass Play Button (for songs, albums, and playable playlists)
+                    if self.isQuickPlayable, self.isHovering {
+                        Button(action: self.onQuickPlay) {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.primary)
+                                .offset(x: 1.5)
+                                .frame(width: 42, height: 42)
+                                .compatGlass(interactive: true, in: .circle)
+                                .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 3)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                    }
+                }
+                .frame(width: Self.artworkSize, height: Self.artworkSize)
+                .clipShape(.rect(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                )
+                .shadow(
+                    color: self.isHovering ? .black.opacity(0.25) : .black.opacity(0.10),
+                    radius: self.isHovering ? 14 : 6,
+                    x: 0,
+                    y: self.isHovering ? 6 : 2
+                )
+
+                // Title & Subtitle
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
+                    Text(self.item.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    if let subtitle = item.homeCardSubtitle {
+                    if let subtitle = self.item.homeCardSubtitle {
                         Text(subtitle)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-
-                Spacer(minLength: 0)
-
-                // Quick Play Circle
-                Button {
-                    self.onPlayItem(item)
-                } label: {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 28, height: 28)
-                        .compatGlass(interactive: true, in: .circle)
-                }
-                .buttonStyle(.plain)
+                .frame(width: Self.cardWidth, alignment: .leading)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity)
-            .frame(height: 76)
-            .compatGlass(interactive: true, in: .rect(cornerRadius: 12))
+            .frame(width: Self.cardWidth)
         }
         .buttonStyle(.plain)
+        .scaleEffect(self.isHovering ? 1.02 : 1.0)
+        .animation(AppAnimation.spring, value: self.isHovering)
+        .onHover { hovering in
+            withAnimation(AppAnimation.quick) {
+                self.isHovering = hovering
+            }
+        }
+        .accessibilityLabel(String(localized: "\(self.item.title), \(self.item.homeCardSubtitle ?? "")"))
     }
 }

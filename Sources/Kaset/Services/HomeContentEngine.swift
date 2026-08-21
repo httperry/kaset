@@ -25,10 +25,10 @@ enum HomeContentEngine {
             return HomeProvisionedContent()
         }
 
-        // 1. Select Hero Candidate
-        let heroItem = Self.selectHeroItem(from: rawSections, affinityEngine: affinityEngine)
+        // 1. Select Multi-Item Hero Spotlights
+        let heroItems = Self.selectHeroItems(from: rawSections, affinityEngine: affinityEngine)
 
-        // 2. Select Activity Bento ("Jump Back In")
+        // 2. Select Jump Back In Recent Items
         let jumpBackIn = Self.selectJumpBackIn(from: rawSections, affinityEngine: affinityEngine)
 
         // 3. Process & Classify Downstream Shelves
@@ -46,7 +46,7 @@ enum HomeContentEngine {
         }
 
         return HomeProvisionedContent(
-            heroItem: heroItem,
+            heroItems: heroItems,
             jumpBackIn: jumpBackIn,
             curatedShelves: curatedShelves
         )
@@ -54,11 +54,11 @@ enum HomeContentEngine {
 
     // MARK: - Hero Selection
 
-    /// Selects or synthesizes the top featured Hero banner item using behavioral affinity, time-of-day context, and anti-habituation.
-    static func selectHeroItem(
+    /// Selects the top 3 to 5 featured Hero banner items for the Grand Cinematic Stage.
+    static func selectHeroItems(
         from sections: [HomeSection],
         affinityEngine: UserAffinityEngine
-    ) -> HomeHeroItemPayload? {
+    ) -> [HomeHeroItemPayload] {
         struct ScoredHeroCandidate {
             let item: HomeSectionItem
             let score: Double
@@ -110,7 +110,7 @@ enum HomeContentEngine {
             ))
         }
 
-        guard !candidates.isEmpty else { return nil }
+        guard !candidates.isEmpty else { return [] }
 
         // Deduplicate candidates by item ID
         var seenIDs = Set<String>()
@@ -131,37 +131,46 @@ enum HomeContentEngine {
             elitePool.append(previous) // Move to back of elite pool
         }
 
-        let selectedCandidate = elitePool.first ?? uniqueCandidates[0]
-        let selectedItem = selectedCandidate.item
+        if let firstCandidate = elitePool.first {
+            affinityEngine.recordHeroShown(itemId: firstCandidate.item.id)
+        }
 
-        // Record chosen hero for anti-habituation on next refresh
-        affinityEngine.recordHeroShown(itemId: selectedItem.id)
+        return elitePool.map { candidate in
+            let item = candidate.item
+            let artistSummary = Self.extractTopArtistsSummary(from: [item])
+            let editorialDesc = affinityEngine.generateHeroEditorialDescription(
+                title: item.title,
+                artistSummary: artistSummary.isEmpty ? (item.subtitle ?? "") : artistSummary
+            )
 
-        let artistSummary = Self.extractTopArtistsSummary(from: [selectedItem])
-        let editorialDesc = affinityEngine.generateHeroEditorialDescription(
-            title: selectedItem.title,
-            artistSummary: artistSummary.isEmpty ? (selectedItem.subtitle ?? "") : artistSummary
-        )
+            return HomeHeroItemPayload(
+                id: item.id,
+                title: item.title,
+                artistSubtitle: item.subtitle ?? "Personalized Selection",
+                editorialDescription: editorialDesc,
+                thumbnailURL: item.thumbnailURL,
+                badgeText: candidate.badgeText,
+                playTarget: Self.makePlayTarget(from: item)
+            )
+        }
+    }
 
-        return HomeHeroItemPayload(
-            id: selectedItem.id,
-            title: selectedItem.title,
-            artistSubtitle: selectedItem.subtitle ?? "Personalized Selection",
-            editorialDescription: editorialDesc,
-            thumbnailURL: selectedItem.thumbnailURL,
-            badgeText: selectedCandidate.badgeText,
-            playTarget: Self.makePlayTarget(from: selectedItem)
-        )
+    /// Convenience single-item hero selector.
+    static func selectHeroItem(
+        from sections: [HomeSection],
+        affinityEngine: UserAffinityEngine
+    ) -> HomeHeroItemPayload? {
+        self.selectHeroItems(from: sections, affinityEngine: affinityEngine).first
     }
 
     // MARK: - Jump Back In Selection
 
-    /// Selects the 1 primary feature item and 4 secondary pill items for the Activity Bento.
+    /// Selects the 1 primary feature item and 4 secondary pill items for the Jump Back In shelf.
     static func selectJumpBackIn(
         from sections: [HomeSection],
         affinityEngine: UserAffinityEngine
     ) -> HomeBentoItemPayload? {
-        // Collect candidate items from "Listen again", "Quick picks", "From your Library"
+        // Collect candidate items from "Listen again", "Jump back in", "Library", "Quick picks"
         var candidateItems: [HomeSectionItem] = []
 
         for section in sections {
@@ -171,29 +180,27 @@ enum HomeContentEngine {
             }
         }
 
-        // Fallback to all items if specific shelves aren't present
         if candidateItems.isEmpty {
             candidateItems = sections.flatMap(\.items)
         }
 
-        // Filter out disliked items and deduplicate candidates by ID
+        // Filter out disliked items and deduplicate
         var seenIDs = Set<String>()
         var uniqueCandidates = candidateItems.filter { item in
             let score = affinityEngine.computeAffinityScore(videoId: item.videoId, artist: item.subtitle, albumId: item.album?.id)
-            guard score >= 0 else { return false } // Dislike suppression
+            guard score >= 0 else { return false }
             return seenIDs.insert(item.id).inserted
         }
 
         guard !uniqueCandidates.isEmpty else { return nil }
 
-        // Sort candidates by composite affinity & frequency score
+        // Sort candidates by composite affinity score
         uniqueCandidates.sort { lhs, rhs in
             let lhsScore = affinityEngine.computeAffinityScore(videoId: lhs.videoId, artist: lhs.subtitle, albumId: lhs.album?.id)
             let rhsScore = affinityEngine.computeAffinityScore(videoId: rhs.videoId, artist: rhs.subtitle, albumId: rhs.album?.id)
             if lhsScore != rhsScore {
                 return lhsScore > rhsScore
             }
-
             let lhsRecentIndex = lhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
             let rhsRecentIndex = rhs.videoId.flatMap { affinityEngine.profile.recentVideoIDs.firstIndex(of: $0) } ?? Int.max
             return lhsRecentIndex < rhsRecentIndex
@@ -210,7 +217,7 @@ enum HomeContentEngine {
             return false
         }
 
-        // Anti-habituation for Bento primary item
+        // Anti-habituation for primary item
         if let lastPrimaryID = affinityEngine.profile.lastBentoPrimaryID,
            albumPlaylistCandidates.count > 1,
            albumPlaylistCandidates.first?.id == lastPrimaryID
@@ -224,15 +231,15 @@ enum HomeContentEngine {
 
         // Secondary items: next 4 distinct items with diversity constraint (no more than 2 from same artist)
         var secondaryItems: [HomeSectionItem] = []
-        var artistCountInPills: [String: Int] = [:]
+        var artistCounts: [String: Int] = [:]
 
         for item in uniqueCandidates where item.id != primaryItem.id {
             let artistKey = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let currentCount = artistCountInPills[artistKey, default: 0]
+            let currentCount = artistCounts[artistKey, default: 0]
             if currentCount < 2 || artistKey.isEmpty {
                 secondaryItems.append(item)
                 if !artistKey.isEmpty {
-                    artistCountInPills[artistKey] = currentCount + 1
+                    artistCounts[artistKey] = currentCount + 1
                 }
             }
             if secondaryItems.count == 4 {
@@ -241,6 +248,7 @@ enum HomeContentEngine {
         }
 
         return HomeBentoItemPayload(
+            id: "home-jump-back-in",
             primaryItem: primaryItem,
             secondaryItems: secondaryItems
         )

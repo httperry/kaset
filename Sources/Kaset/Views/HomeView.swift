@@ -90,28 +90,33 @@ struct HomeView: View {
                 }
 
                 if let provisioned = self.viewModel.provisionedContent, !provisioned.isEmpty {
-                    // Layer 1: Grand Cinematic Hero Spotlight Banner
-                    if let hero = provisioned.heroItem {
+                    // Layer 1: Grand 16:9 Cinematic Hero Spotlight Stage
+                    if !provisioned.heroItems.isEmpty {
                         HomeHeroSpotlightView(
-                            heroItem: hero,
-                            onPlay: { self.playTarget(hero.playTarget) },
-                            onNavigate: { self.navigateTarget(hero.playTarget) }
+                            heroItems: provisioned.heroItems,
+                            onPlayTarget: { self.playTarget($0) },
+                            onNavigateTarget: { self.navigateTarget($0) },
+                            onNavigateArtist: { self.navigationPath.append($0) }
                         )
                         .padding(.horizontal, DetailContentLayout.horizontalInset)
                         .staggeredAppearance(index: 1)
                     }
 
-                    // Layer 2: Activity Bento ("Jump Back In")
+                    // Layer 2: "Jump Back In" Recent Rotation Shelf (8 Items)
                     if let bento = provisioned.jumpBackIn {
                         HomeActivityBentoView(
                             bentoPayload: bento,
+                            onPlaySong: { song in
+                                Task { await self.playerService.playWithRadio(song: song) }
+                            },
                             onPlayItem: { self.playSectionItem($0) },
                             onNavigateItem: { self.navigateSectionItem($0) },
+                            onNavigateArtist: { self.navigationPath.append($0) },
                             onViewMore: {
-                                // Navigate to user library / history
-                            }
+                                // Navigate to library
+                            },
+                            contentInset: DetailContentLayout.horizontalInset
                         )
-                        .padding(.horizontal, DetailContentLayout.horizontalInset)
                         .staggeredAppearance(index: 2)
                     }
 
@@ -188,7 +193,7 @@ struct HomeView: View {
                     Task { await self.playerService.playWithRadio(song: song) }
                 },
                 onNavigateSong: { song in
-                    self.navigateSectionItem(.song(song))
+                    Task { await self.playerService.playWithRadio(song: song) }
                 },
                 contentInset: DetailContentLayout.horizontalInset
             )
@@ -210,7 +215,7 @@ struct HomeView: View {
                     Task { await self.playerService.playWithRadio(song: song) }
                 },
                 onNavigateVideo: { song in
-                    self.navigateSectionItem(.song(song))
+                    Task { await self.playerService.playWithRadio(song: song) }
                 },
                 contentInset: DetailContentLayout.horizontalInset
             )
@@ -290,21 +295,8 @@ struct HomeView: View {
     private func navigateTarget(_ target: HomePlayTarget) {
         switch target {
         case let .song(song):
-            if let album = song.album, album.hasNavigableId {
-                let playlist = Playlist(
-                    id: album.id,
-                    title: album.title,
-                    description: nil,
-                    thumbnailURL: album.thumbnailURL ?? song.thumbnailURL,
-                    trackCount: album.trackCount,
-                    author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
-                )
-                self.navigationPath.append(playlist)
-            } else if let artist = song.artists.first(where: { $0.hasNavigableId }) {
-                self.navigationPath.append(artist)
-            } else {
-                Task { await self.playerService.playWithRadio(song: song) }
-            }
+            // CLICKING A SONG PLAYS THE SONG!
+            Task { await self.playerService.playWithRadio(song: song) }
         case let .album(album):
             let playlist = Playlist(
                 id: album.id,
@@ -348,20 +340,9 @@ struct HomeView: View {
     private func navigateSectionItem(_ item: HomeSectionItem) {
         switch item {
         case let .song(song):
-            if let album = song.album, album.hasNavigableId {
-                let playlist = Playlist(
-                    id: album.id,
-                    title: album.title,
-                    description: nil,
-                    thumbnailURL: album.thumbnailURL ?? song.thumbnailURL,
-                    trackCount: album.trackCount,
-                    author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
-                )
-                self.navigationPath.append(playlist)
-            } else if let artist = song.artists.first(where: { $0.hasNavigableId }) {
-                self.navigationPath.append(artist)
-            } else {
-                Task { await self.playerService.playWithRadio(song: song) }
+            // CLICKING A SONG PLAYS THE SONG!
+            Task {
+                await self.playerService.playWithRadio(song: song)
             }
         case let .album(album):
             let playlist = Playlist(

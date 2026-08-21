@@ -65,7 +65,14 @@ private struct HomeMediumCardItemView: View {
     }
 
     var body: some View {
-        Button(action: self.onNavigate) {
+        Button {
+            switch self.item {
+            case .song:
+                self.onPlay()
+            case .album, .playlist, .artist:
+                self.onNavigate()
+            }
+        } label: {
             VStack(alignment: .leading, spacing: 8) {
                 // 175x175 Artwork Box
                 ZStack {
