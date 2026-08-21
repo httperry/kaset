@@ -142,6 +142,7 @@ enum HomeContentEngine {
                 title: item.title,
                 artistSummary: artistSummary.isEmpty ? (item.subtitle ?? "") : artistSummary
             )
+            let artistCover = Self.findArtistCoverURL(for: item, in: sections)
 
             return HomeHeroItemPayload(
                 id: item.id,
@@ -149,6 +150,7 @@ enum HomeContentEngine {
                 artistSubtitle: item.subtitle ?? "Personalized Selection",
                 editorialDescription: editorialDesc,
                 thumbnailURL: item.thumbnailURL,
+                artistCoverURL: artistCover,
                 badgeText: candidate.badgeText,
                 playTarget: Self.makePlayTarget(from: item)
             )
@@ -337,6 +339,29 @@ enum HomeContentEngine {
     }
 
     // MARK: - Helper Methods
+
+    private static func findArtistCoverURL(
+        for item: HomeSectionItem,
+        in sections: [HomeSection]
+    ) -> URL? {
+        if case let .artist(artist) = item {
+            return artist.thumbnailURL?.highQualityThumbnailURL
+        }
+
+        let targetArtistName = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        for section in sections {
+            for sectionItem in section.items {
+                if case let .artist(artist) = sectionItem {
+                    if let name = targetArtistName, !name.isEmpty, artist.name.lowercased() == name, let url = artist.thumbnailURL {
+                        return url.highQualityThumbnailURL
+                    }
+                }
+            }
+        }
+
+        return nil
+    }
 
     private static func makePlayTarget(from item: HomeSectionItem) -> HomePlayTarget {
         switch item {

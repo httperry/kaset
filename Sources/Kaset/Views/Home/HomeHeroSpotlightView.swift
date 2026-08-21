@@ -2,15 +2,15 @@
 //  HomeHeroSpotlightView.swift
 //  Kaset
 //
-//  Grand 410pt 16:9 Cinematic Hero Spotlight Stage with multi-item carousel,
-//  dynamic blurred artwork backdrop, and Liquid Glass controls.
+//  Grand 410pt 16:9 Cinematic Hero Spotlight Stage with Spotify-style 16:9 artist
+//  cover image backdrop, dynamic color mesh, and Liquid Glass controls.
 //
 
 import SwiftUI
 
 // MARK: - HomeHeroSpotlightView
 
-/// Grand 16:9 Cinematic Featured Spotlight Stage with multi-item carousel.
+/// Grand 16:9 Cinematic Featured Spotlight Stage with 16:9 artist backdrop and multi-item carousel.
 struct HomeHeroSpotlightView: View {
     let heroItems: [HomeHeroItemPayload]
     let onPlayTarget: (HomePlayTarget) -> Void
@@ -22,7 +22,7 @@ struct HomeHeroSpotlightView: View {
     @State private var isHovering = false
 
     private static let bannerHeight: CGFloat = 410
-    private static let artworkSize: CGFloat = 230
+    private static let artworkSize: CGFloat = 220
 
     private var currentItem: HomeHeroItemPayload? {
         guard !self.heroItems.isEmpty else { return nil }
@@ -33,21 +33,24 @@ struct HomeHeroSpotlightView: View {
     var body: some View {
         if let currentItem {
             ZStack(alignment: .bottomLeading) {
-                // Layer 1: Ambient Blurred Artwork Backdrop
-                self.backdropLayer(for: currentItem)
+                // Layer 1: Dark Canvas Base
+                Color(nsColor: NSColor(white: 0.05, alpha: 1.0))
 
-                // Layer 2: Dynamic Radial Mesh Gradient
+                // Layer 2: 16:9 Artist Cover Image on the Right (Spotify-style)
+                self.artistCoverBackdrop(for: currentItem)
+
+                // Layer 3: Dynamic Ambient Color Mesh Gradient
                 self.colorMeshLayer
 
-                // Layer 3: Dark Vignettes for Contrast
+                // Layer 4: Vignettes for Maximum Text Legibility & Contrast
                 self.vignetteLayer
 
-                // Layer 4: Foreground Hero Stage Content
+                // Layer 5: Foreground Hero Stage Content
                 HStack(alignment: .bottom, spacing: 32) {
-                    // Left 230x230 Artwork Box
+                    // Left 220x220 3D Artwork Box
                     self.artworkView(for: currentItem)
 
-                    // Right Details & Actions
+                    // Right Details & Action Bar
                     self.detailsView(for: currentItem)
 
                     Spacer(minLength: 0)
@@ -55,7 +58,7 @@ struct HomeHeroSpotlightView: View {
                 .padding(.horizontal, 36)
                 .padding(.vertical, 34)
 
-                // Layer 5: Carousel Controls (Next/Prev and Dots)
+                // Layer 6: Carousel Controls (Next/Prev and Dots)
                 if self.heroItems.count > 1 {
                     self.carouselControls
                 }
@@ -73,7 +76,7 @@ struct HomeHeroSpotlightView: View {
                     self.isHovering = hovering
                 }
             }
-            .task(id: currentItem.thumbnailURL) {
+            .task(id: currentItem.id) {
                 if let url = currentItem.thumbnailURL {
                     self.palette = await ColorExtractor.cachedPalette(for: url)
                 }
@@ -83,36 +86,57 @@ struct HomeHeroSpotlightView: View {
         }
     }
 
-    // MARK: - Backdrop Layers
+    // MARK: - 16:9 Artist Cover Backdrop (Spotify Style)
 
-    private func backdropLayer(for item: HomeHeroItemPayload) -> some View {
-        ZStack {
-            Color(nsColor: NSColor(white: 0.06, alpha: 1.0))
+    private func artistCoverBackdrop(for item: HomeHeroItemPayload) -> some View {
+        let imageURL = item.artistCoverURL ?? item.thumbnailURL?.highQualityThumbnailURL
 
-            if let url = item.thumbnailURL {
-                CachedAsyncImage(
-                    url: url,
-                    targetSize: CGSize(width: 600, height: 600)
-                ) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .scaleEffect(1.4)
-                        .blur(radius: 70)
-                        .opacity(0.48)
-                } placeholder: {
-                    EmptyView()
+        return HStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            ZStack {
+                if let url = imageURL {
+                    CachedAsyncImage(
+                        url: url,
+                        targetSize: CGSize(width: 800, height: 450)
+                    ) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 680, height: Self.bannerHeight)
+                            .clipped()
+                    } placeholder: {
+                        EmptyView()
+                    }
                 }
             }
+            .frame(width: 680, height: Self.bannerHeight)
+            // Spotify-style smooth horizontal fade mask: transparent on left, solid on right
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: .black.opacity(0.20), location: 0.22),
+                        .init(color: .black.opacity(0.75), location: 0.55),
+                        .init(color: .black, location: 0.85),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .opacity(0.70)
         }
+        .allowsHitTesting(false)
     }
+
+    // MARK: - Color Mesh Layer
 
     private var colorMeshLayer: some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    self.palette.primary.opacity(0.65),
-                    self.palette.secondary.opacity(0.40),
+                    self.palette.primary.opacity(0.60),
+                    self.palette.secondary.opacity(0.35),
                     Color(nsColor: NSColor(white: 0.04, alpha: 0.95)),
                 ],
                 startPoint: .topLeading,
@@ -121,43 +145,48 @@ struct HomeHeroSpotlightView: View {
 
             RadialGradient(
                 colors: [
-                    self.palette.primary.opacity(0.75),
-                    self.palette.primary.opacity(0.20),
+                    self.palette.primary.opacity(0.70),
+                    self.palette.primary.opacity(0.15),
                     .clear,
                 ],
-                center: .init(x: 0.22, y: 0.65),
+                center: .init(x: 0.18, y: 0.70),
                 startRadius: 20,
-                endRadius: 320
-            )
-            .allowsHitTesting(false)
-        }
-    }
-
-    private var vignetteLayer: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    .clear,
-                    .black.opacity(0.25),
-                    .black.opacity(0.80),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            LinearGradient(
-                colors: [
-                    .black.opacity(0.45),
-                    .clear,
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
+                endRadius: 360
             )
         }
         .allowsHitTesting(false)
     }
 
-    // MARK: - Artwork View
+    // MARK: - Vignette Layer
+
+    private var vignetteLayer: some View {
+        ZStack {
+            // Dark solid-to-clear fade from the left over text and album box
+            LinearGradient(
+                stops: [
+                    .init(color: .black.opacity(0.85), location: 0.0),
+                    .init(color: .black.opacity(0.60), location: 0.42),
+                    .init(color: .clear, location: 0.80),
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            // Bottom subtle vignette
+            LinearGradient(
+                colors: [
+                    .clear,
+                    .black.opacity(0.30),
+                    .black.opacity(0.75),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .allowsHitTesting(false)
+    }
+
+    // MARK: - Artwork View (Left Box)
 
     private func artworkView(for item: HomeHeroItemPayload) -> some View {
         Button {
@@ -165,7 +194,7 @@ struct HomeHeroSpotlightView: View {
             self.onPlayTarget(item.playTarget)
         } label: {
             ZStack {
-                if let url = item.thumbnailURL {
+                if let url = item.thumbnailURL?.highQualityThumbnailURL {
                     CachedAsyncImage(
                         url: url,
                         targetSize: CGSize(width: Self.artworkSize, height: Self.artworkSize)
