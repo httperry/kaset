@@ -95,7 +95,15 @@ struct HomeView: View {
                         HomeHeroSpotlightView(
                             heroItems: provisioned.heroItems,
                             onFetchArtistBanner: { artistId in
-                                try? await self.viewModel.client.getArtist(id: artistId).thumbnailURL
+                                try? await self.viewModel.client.getArtist(id: artistId).thumbnailURL?.ultraHighQualityThumbnailURL
+                            },
+                            onFetchPlaylistTracks: { playlistId in
+                                if let res = try? await self.viewModel.client.getPlaylist(id: playlistId) {
+                                    let urls = res.detail.tracks.compactMap { $0.thumbnailURL?.ultraHighQualityThumbnailURL ?? $0.thumbnailURL }
+                                    var seen = Set<URL>()
+                                    return urls.filter { seen.insert($0).inserted }
+                                }
+                                return []
                             },
                             onPlayTarget: { self.playTarget($0) },
                             onNavigateTarget: { self.navigateTarget($0) },

@@ -14,6 +14,7 @@ import SwiftUI
 struct HomeHeroSpotlightView: View {
     let heroItems: [HomeHeroItemPayload]
     var onFetchArtistBanner: (@Sendable (String) async -> URL?)?
+    var onFetchPlaylistTracks: (@Sendable (String) async -> [URL])?
     let onPlayTarget: (HomePlayTarget) -> Void
     let onNavigateTarget: (HomePlayTarget) -> Void
     let onNavigateArtist: (Artist) -> Void
@@ -27,6 +28,7 @@ struct HomeHeroSpotlightView: View {
     @State private var isHoveringPrev = false
     @State private var isHoveringNext = false
     @State private var artistBanners: [String: URL] = [:]
+    @State private var playlistArtworks: [String: [URL]] = [:]
 
     private static let bannerHeight: CGFloat = 480
     private static let artworkSize: CGFloat = 190
@@ -44,8 +46,8 @@ struct HomeHeroSpotlightView: View {
                 // Layer 1: Translucent Base (De-darkened)
                 Color(nsColor: NSColor(white: 0.10, alpha: 0.85))
 
-                // Layer 2: Artist Cover Image on the Right
-                self.artistCoverBackdrop(for: currentItem)
+                // Layer 2: Full-Span Artist Cover or Dynamic Multi-Track Diagonal Slices
+                self.backdropView(for: currentItem)
                     .id(currentItem.id)
                     .transition(.opacity)
 
@@ -57,7 +59,7 @@ struct HomeHeroSpotlightView: View {
                 // Layer 4: Soft Vignettes for Text Legibility without pitch blackness
                 self.vignetteLayer
 
-                // Layer 5: Foreground Hero Stage Content (Anchored to the bottom with equal 28pt margin)
+                // Layer 5: Foreground Hero Stage Content (Anchored to the bottom-left with equal 28pt margin)
                 VStack {
                     Spacer(minLength: 0)
 
@@ -69,11 +71,6 @@ struct HomeHeroSpotlightView: View {
                         self.detailsView(for: currentItem)
 
                         Spacer(minLength: 0)
-
-                        // Bottom-Right Integrated Navigation & Pagination Pill
-                        if self.heroItems.count > 1 {
-                            self.bottomRightPaginationPill
-                        }
                     }
                     .padding(.leading, 28)
                     .padding(.trailing, 28)
@@ -84,6 +81,19 @@ struct HomeHeroSpotlightView: View {
                     insertion: .opacity.combined(with: .scale(scale: 0.98)),
                     removal: .opacity
                 ))
+
+                // Layer 6: Static Bottom-Right Navigation Pill (Stable, never remounts or re-transitions)
+                if self.heroItems.count > 1 {
+                    VStack {
+                        Spacer(minLength: 0)
+                        HStack {
+                            Spacer(minLength: 0)
+                            self.bottomRightPaginationPill
+                        }
+                        .padding(.trailing, 28)
+                        .padding(.bottom, 28)
+                    }
+                }
             }
             .frame(maxWidth: .infinity)
             .frame(height: Self.bannerHeight)
@@ -98,28 +108,50 @@ struct HomeHeroSpotlightView: View {
                     self.isHoveringCard = hovering
                 }
             }
-            .animation(AppAnimation.smooth, value: self.selectedIndex)
             .task(id: currentItem.id) {
                 if let url = currentItem.thumbnailURL {
                     self.palette = await ColorExtractor.cachedPalette(for: url)
                 }
             }
-            // Pre-fetch all artist banners upfront concurrently across all hero items
+            // Pre-fetch all artist banners and playlist track artworks upfront concurrently
             .task(id: self.heroItems.map(\.id)) {
-                await withTaskGroup(of: (String, URL?).self) { group in
+                await withTaskGroup(of: (String, URL?, [URL]?).self) { group in
                     for item in self.heroItems {
-                        let artistId = item.featuredArtistId ?? item.playTarget.artist?.id
-                        if let artistId, !artistId.isEmpty, let fetcher = self.onFetchArtistBanner {
-                            group.addTask {
-                                let url = await fetcher(artistId)
-                                return (item.id, url?.highQualityThumbnailURL)
+                        group.addTask {
+                            var bannerURL: URL?
+                            var trackURLs: [URL]?
+
+                            switch item.playTarget {
+                            case .playlist:
+                                if let fetcher = self.onFetchPlaylistTracks {
+                                    let urls = await fetcher(item.playTarget.id)
+                                    if !urls.isEmpty {
+                                        trackURLs = urls.compactMap { $0.ultraHighQualityThumbnailURL ?? $0 }
+                                    }
+                                }
+                                if let artistId = item.featuredArtistId ?? item.playTarget.artist?.id,
+                                   !artistId.isEmpty, let fetcher = self.onFetchArtistBanner
+                                {
+                                    bannerURL = await (fetcher(artistId))?.ultraHighQualityThumbnailURL
+                                }
+                            case .album, .song, .artist:
+                                if let artistId = item.featuredArtistId ?? item.playTarget.artist?.id,
+                                   !artistId.isEmpty, let fetcher = self.onFetchArtistBanner
+                                {
+                                    bannerURL = await (fetcher(artistId))?.ultraHighQualityThumbnailURL
+                                }
                             }
+
+                            return (item.id, bannerURL, trackURLs)
                         }
                     }
-                    for await (itemId, url) in group {
-                        if let url {
-                            withAnimation(AppAnimation.smooth) {
-                                self.artistBanners[itemId] = url
+                    for await (itemId, bannerURL, trackURLs) in group {
+                        withAnimation(AppAnimation.smooth) {
+                            if let bannerURL {
+                                self.artistBanners[itemId] = bannerURL
+                            }
+                            if let trackURLs {
+                                self.playlistArtworks[itemId] = trackURLs
                             }
                         }
                     }
@@ -142,17 +174,33 @@ struct HomeHeroSpotlightView: View {
         }
     }
 
-    // MARK: - Artist Cover Backdrop (Full-Span & Expansive)
+    // MARK: - Backdrop View (Dynamic Multi-Artist Diagonal Slices or Full-Span Artist Cover)
 
-    private func artistCoverBackdrop(for item: HomeHeroItemPayload) -> some View {
-        let imageURL = self.artistBanners[item.id] ?? item.artistCoverURL ?? item.thumbnailURL?.highQualityThumbnailURL
+    private func backdropView(for item: HomeHeroItemPayload) -> some View {
+        let isPlaylist = switch item.playTarget {
+        case .playlist:
+            true
+        default:
+            false
+        }
 
-        return GeometryReader { geo in
+        // For playlists with multi-track artworks, render 4-5 diagonal split slice collage
+        if isPlaylist, let urls = self.playlistArtworks[item.id], urls.count >= 2 {
+            return AnyView(self.diagonalSlicesBackdrop(urls: urls))
+        }
+
+        // Single artist cover or high-res thumbnail
+        let imageURL = self.artistBanners[item.id] ?? item.artistCoverURL?.ultraHighQualityThumbnailURL ?? item.thumbnailURL?.ultraHighQualityThumbnailURL
+        return AnyView(self.singleImageBackdrop(imageURL: imageURL))
+    }
+
+    private func singleImageBackdrop(imageURL: URL?) -> some View {
+        GeometryReader { geo in
             ZStack(alignment: .trailing) {
                 if let url = imageURL {
                     CachedAsyncImage(
                         url: url,
-                        targetSize: CGSize(width: 1400, height: 700)
+                        targetSize: CGSize(width: 1920, height: 1080)
                     ) { image in
                         image
                             .resizable()
@@ -161,6 +209,61 @@ struct HomeHeroSpotlightView: View {
                             .clipped()
                     } placeholder: {
                         EmptyView()
+                    }
+                }
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func diagonalSlicesBackdrop(urls: [URL]) -> some View {
+        let count = min(max(urls.count, 2), 5)
+        let sliceURLs = Array(urls.prefix(count))
+        let slant: CGFloat = 65
+
+        return GeometryReader { geo in
+            ZStack {
+                // Slices
+                ForEach(0 ..< sliceURLs.count, id: \.self) { idx in
+                    let url = sliceURLs[idx]
+                    let totalCount = CGFloat(count)
+                    let effectiveWidth = geo.size.width + slant
+                    let sliceWidth = effectiveWidth / totalCount
+                    let midpointX = (CGFloat(idx) + 0.5) * sliceWidth - slant / 2
+
+                    CachedAsyncImage(
+                        url: url,
+                        targetSize: CGSize(width: 1200, height: 1200)
+                    ) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: max(sliceWidth + slant + 60, geo.size.height * 1.05), height: geo.size.height)
+                            .clipped()
+                    } placeholder: {
+                        Color(nsColor: NSColor(white: 0.12, alpha: 1.0))
+                    }
+                    .position(x: midpointX, y: geo.size.height / 2)
+                    .clipShape(DiagonalSliceShape(index: idx, sliceCount: count, slant: slant))
+                }
+
+                // Divider Lines between Slices
+                if count > 1 {
+                    ForEach(1 ..< count, id: \.self) { idx in
+                        DiagonalSliceDividerShape(index: idx, sliceCount: count, slant: slant)
+                            .stroke(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .white.opacity(0.30), location: 0.0),
+                                        .init(color: .white.opacity(0.10), location: 0.75),
+                                        .init(color: .clear, location: 1.0),
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
                     }
                 }
             }
@@ -505,5 +608,60 @@ struct HomeHeroSpotlightView: View {
             return "square.stack.fill"
         }
         return "music.note"
+    }
+}
+
+// MARK: - DiagonalSliceShape
+
+struct DiagonalSliceShape: Shape {
+    let index: Int
+    let sliceCount: Int
+    let slant: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard self.sliceCount >= 1 else { return path }
+
+        let totalCount = CGFloat(self.sliceCount)
+        let effectiveWidth = rect.width + self.slant
+        let sliceWidth = effectiveWidth / totalCount
+
+        let startXTop = CGFloat(self.index) * sliceWidth - self.slant
+        let endXTop = CGFloat(self.index + 1) * sliceWidth - self.slant
+        let startXBottom = CGFloat(self.index) * sliceWidth
+        let endXBottom = CGFloat(self.index + 1) * sliceWidth
+
+        path.move(to: CGPoint(x: startXTop, y: 0))
+        path.addLine(to: CGPoint(x: endXTop, y: 0))
+        path.addLine(to: CGPoint(x: endXBottom, y: rect.height))
+        path.addLine(to: CGPoint(x: startXBottom, y: rect.height))
+        path.closeSubpath()
+
+        return path
+    }
+}
+
+// MARK: - DiagonalSliceDividerShape
+
+struct DiagonalSliceDividerShape: Shape {
+    let index: Int
+    let sliceCount: Int
+    let slant: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard self.sliceCount >= 1 else { return path }
+
+        let totalCount = CGFloat(self.sliceCount)
+        let effectiveWidth = rect.width + self.slant
+        let sliceWidth = effectiveWidth / totalCount
+
+        let topX = CGFloat(self.index) * sliceWidth - self.slant
+        let bottomX = CGFloat(self.index) * sliceWidth
+
+        path.move(to: CGPoint(x: topX, y: 0))
+        path.addLine(to: CGPoint(x: bottomX, y: rect.height))
+
+        return path
     }
 }

@@ -371,17 +371,17 @@ enum HomeContentEngine {
     ) -> (artistId: String?, coverURL: URL?) {
         // 1. Direct artist item
         if case let .artist(artist) = item {
-            return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+            return (artist.id, artist.thumbnailURL?.ultraHighQualityThumbnailURL ?? artist.thumbnailURL)
         }
 
         // 2. Song with navigable artist
         if case let .song(song) = item, let artist = song.artists.first(where: { $0.hasNavigableId }) {
-            return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+            return (artist.id, artist.thumbnailURL?.ultraHighQualityThumbnailURL ?? artist.thumbnailURL)
         }
 
         // 3. Album with navigable artist
         if case let .album(album) = item, let artist = album.artists?.first(where: { $0.hasNavigableId }) {
-            return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+            return (artist.id, artist.thumbnailURL?.ultraHighQualityThumbnailURL ?? artist.thumbnailURL)
         }
 
         // 4. Playlist or general item: match artist from subtitle in home sections
@@ -392,7 +392,7 @@ enum HomeContentEngine {
                     if let name = targetArtistName, !name.isEmpty,
                        artist.name.lowercased() == name || name.contains(artist.name.lowercased())
                     {
-                        return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+                        return (artist.id, artist.thumbnailURL?.ultraHighQualityThumbnailURL ?? artist.thumbnailURL)
                     }
                 }
             }
@@ -402,7 +402,7 @@ enum HomeContentEngine {
         for section in sections {
             for sectionItem in section.items {
                 if case let .artist(artist) = sectionItem, artist.hasNavigableId {
-                    return (artist.id, artist.thumbnailURL?.highQualityThumbnailURL)
+                    return (artist.id, artist.thumbnailURL?.ultraHighQualityThumbnailURL ?? artist.thumbnailURL)
                 }
             }
         }

@@ -55,17 +55,70 @@ extension View {
 // MARK: - URL Extensions
 
 extension URL {
-    /// Returns a higher quality YouTube thumbnail URL.
+    /// Returns a higher quality YouTube thumbnail URL (544px).
     var highQualityThumbnailURL: URL? {
-        guard host?.contains("ytimg.com") == true || host?.contains("googleusercontent.com") == true else {
+        guard let host = self.host,
+              host.contains("ytimg.com") || host.contains("googleusercontent.com") || host.contains("ggpht.com")
+        else {
             return self
         }
 
-        var urlString = absoluteString
+        var urlString = self.absoluteString
 
         // Replace size parameters for higher quality
-        urlString = urlString.replacingOccurrences(of: "w60-h60", with: "w226-h226")
-        urlString = urlString.replacingOccurrences(of: "w120-h120", with: "w226-h226")
+        urlString = urlString.replacingOccurrences(of: "w60-h60", with: "w544-h544")
+        urlString = urlString.replacingOccurrences(of: "w120-h120", with: "w544-h544")
+        urlString = urlString.replacingOccurrences(of: "w226-h226", with: "w544-h544")
+
+        return URL(string: urlString)
+    }
+
+    /// Returns an ultra high-resolution (1200px+ / 1080p HD) artwork URL for stage backdrops and hero spotlights.
+    var ultraHighQualityThumbnailURL: URL? {
+        guard let host = self.host,
+              host.contains("ytimg.com") || host.contains("googleusercontent.com") || host.contains("ggpht.com")
+        else {
+            return self
+        }
+
+        var urlString = self.absoluteString
+
+        // 1. Google CDN =w...-h... pattern -> =w1200-h1200-l90-rj
+        if urlString.contains("googleusercontent.com") || urlString.contains("ggpht.com") {
+            if let regex = try? NSRegularExpression(pattern: "=w\\d+-h\\d+[^?#]*") {
+                let range = NSRange(location: 0, length: urlString.utf16.count)
+                urlString = regex.stringByReplacingMatches(
+                    in: urlString,
+                    options: [],
+                    range: range,
+                    withTemplate: "=w1200-h1200-l90-rj"
+                )
+            }
+            // Replace =s... pattern -> =s1200-c-k-c0x00ffffff-no-rj
+            if let regex = try? NSRegularExpression(pattern: "=s\\d+[^?#]*") {
+                let range = NSRange(location: 0, length: urlString.utf16.count)
+                urlString = regex.stringByReplacingMatches(
+                    in: urlString,
+                    options: [],
+                    range: range,
+                    withTemplate: "=s1200-c-k-c0x00ffffff-no-rj"
+                )
+            }
+        }
+
+        // 2. YouTube video thumbnail URLs (i.ytimg.com/vi/<id>/...) -> /hq720.jpg
+        if urlString.contains("ytimg.com") {
+            urlString = urlString.replacingOccurrences(of: "/default.jpg", with: "/hq720.jpg")
+            urlString = urlString.replacingOccurrences(of: "/mqdefault.jpg", with: "/hq720.jpg")
+            urlString = urlString.replacingOccurrences(of: "/hqdefault.jpg", with: "/hq720.jpg")
+            urlString = urlString.replacingOccurrences(of: "/sddefault.jpg", with: "/hq720.jpg")
+            if urlString.contains("w60-h60") || urlString.contains("w120-h120") || urlString.contains("w226-h226") || urlString.contains("w544-h544") {
+                urlString = urlString.replacingOccurrences(of: "w60-h60", with: "w1200-h1200")
+                urlString = urlString.replacingOccurrences(of: "w120-h120", with: "w1200-h1200")
+                urlString = urlString.replacingOccurrences(of: "w226-h226", with: "w1200-h1200")
+                urlString = urlString.replacingOccurrences(of: "w544-h544", with: "w1200-h1200")
+            }
+        }
 
         return URL(string: urlString)
     }
