@@ -344,10 +344,17 @@ enum HomeContentEngine {
         for item: HomeSectionItem,
         in sections: [HomeSection]
     ) -> URL? {
+        // 1. If the item is a song, its video ID provides a true 16:9 YouTube high-res thumbnail!
+        if case let .song(song) = item, !song.videoId.isEmpty {
+            return URL(string: "https://i.ytimg.com/vi/\(song.videoId)/hqdefault.jpg")
+        }
+
+        // 2. If the item itself is an artist, use its high-res thumbnail
         if case let .artist(artist) = item {
             return artist.thumbnailURL?.highQualityThumbnailURL
         }
 
+        // 3. Scan the feed for matching artist photography
         let targetArtistName = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
 
         for section in sections {
