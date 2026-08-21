@@ -85,12 +85,42 @@ struct HomeView: View {
                     .staggeredAppearance(index: 0)
                 }
 
-                // API sections
-                ForEach(self.viewModel.sections) { section in
-                    self.sectionView(section)
-                        .task {
-                            await self.prefetchImagesAsync(for: section)
-                        }
+                if let provisioned = self.viewModel.provisionedContent, !provisioned.isEmpty {
+                    // Layer 1: Cinematic Hero Spotlight Banner
+                    if let hero = provisioned.heroItem {
+                        HomeHeroSpotlightView(
+                            heroItem: hero,
+                            onPlay: { self.playTarget(hero.playTarget) },
+                            onNavigate: { self.navigateTarget(hero.playTarget) }
+                        )
+                        .padding(.horizontal, DetailContentLayout.horizontalInset)
+                        .staggeredAppearance(index: 1)
+                    }
+
+                    // Layer 2: Activity Bento ("Jump Back In")
+                    if let bento = provisioned.jumpBackIn {
+                        HomeActivityBentoView(
+                            bentoPayload: bento,
+                            onPlayItem: { self.playSectionItem($0) },
+                            onNavigateItem: { self.navigateSectionItem($0) }
+                        )
+                        .padding(.horizontal, DetailContentLayout.horizontalInset)
+                        .staggeredAppearance(index: 2)
+                    }
+
+                    // Layer 3+: Classified Curated Downstream Shelves
+                    ForEach(Array(provisioned.curatedShelves.enumerated()), id: \.element.id) { index, shelf in
+                        self.curatedShelfView(shelf)
+                            .staggeredAppearance(index: index + 3)
+                    }
+                } else {
+                    // Fallback to legacy uniform shelves if provisionedContent is not ready
+                    ForEach(self.viewModel.sections) { section in
+                        self.sectionView(section)
+                            .task {
+                                await self.prefetchImagesAsync(for: section)
+                            }
+                    }
                 }
 
                 if self.viewModel.hasMoreSections || self.viewModel.loadingState == .loadingMore {
@@ -107,6 +137,58 @@ struct HomeView: View {
         .accessibilityIdentifier(AccessibilityID.Home.scrollView)
         .pullToRefresh {
             await self.viewModel.refresh()
+        }
+    }
+
+    // MARK: - Curated Shelves
+
+    @ViewBuilder
+    private func curatedShelfView(_ shelf: HomeCuratedShelfPayload) -> some View {
+        switch shelf.content {
+        case let .songTracks(songs):
+            HomeTrackColumnsView(
+                title: shelf.title,
+                songs: songs,
+                onPlaySong: { song in
+                    Task { await self.playerService.playWithRadio(song: song) }
+                },
+                onNavigateSong: { song in
+                    self.navigateSectionItem(.song(song))
+                },
+                contentInset: DetailContentLayout.horizontalInset
+            )
+
+        case let .albumsAndPlaylists(items):
+            HomeMediumCardsView(
+                title: shelf.title,
+                items: items,
+                onPlayItem: { self.playSectionItem($0) },
+                onNavigateItem: { self.navigateSectionItem($0) },
+                contentInset: DetailContentLayout.horizontalInset
+            )
+
+        case let .videoPerformances(videos):
+            HomeVideoPerformancesView(
+                title: shelf.title,
+                videos: videos,
+                onPlayVideo: { song in
+                    Task { await self.playerService.playWithRadio(song: song) }
+                },
+                onNavigateVideo: { song in
+                    self.navigateSectionItem(.song(song))
+                },
+                contentInset: DetailContentLayout.horizontalInset
+            )
+
+        case let .artistPortraits(artists):
+            HomeArtistPortraitsView(
+                title: shelf.title,
+                artists: artists,
+                onNavigateArtist: { artist in
+                    self.navigationPath.append(artist)
+                },
+                contentInset: DetailContentLayout.horizontalInset
+            )
         }
     }
 
@@ -139,11 +221,127 @@ struct HomeView: View {
                 rank: section.isChart ? index + 1 : nil,
                 playAction: self.playlistPlayAction(for: item)
             ) {
-                self.playItem(item, in: section, at: index)
+                self.playSectionItem(item)
             }
             .contextMenu {
                 self.contextMenuItems(for: item, in: section, at: index)
             }
+        }
+    }
+
+    // MARK: - Target Play & Navigation Handlers
+
+    private func playTarget(_ target: HomePlayTarget) {
+        switch target {
+        case let .song(song):
+            Task { await self.playerService.playWithRadio(song: song) }
+        case let .album(album):
+            SongActionsHelper.playAlbum(
+                album,
+                client: self.viewModel.client,
+                playerService: self.playerService
+            )
+        case let .playlist(playlist):
+            SongActionsHelper.playPlaylist(
+                playlist,
+                client: self.viewModel.client,
+                playerService: self.playerService
+            )
+        case let .artist(artist):
+            self.navigationPath.append(artist)
+        }
+    }
+
+    private func navigateTarget(_ target: HomePlayTarget) {
+        switch target {
+        case let .song(song):
+            if let album = song.album, album.hasNavigableId {
+                let playlist = Playlist(
+                    id: album.id,
+                    title: album.title,
+                    description: nil,
+                    thumbnailURL: album.thumbnailURL ?? song.thumbnailURL,
+                    trackCount: album.trackCount,
+                    author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
+                )
+                self.navigationPath.append(playlist)
+            } else if let artist = song.artists.first(where: { $0.hasNavigableId }) {
+                self.navigationPath.append(artist)
+            } else {
+                Task { await self.playerService.playWithRadio(song: song) }
+            }
+        case let .album(album):
+            let playlist = Playlist(
+                id: album.id,
+                title: album.title,
+                description: nil,
+                thumbnailURL: album.thumbnailURL,
+                trackCount: album.trackCount,
+                author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
+            )
+            self.navigationPath.append(playlist)
+        case let .playlist(playlist):
+            self.navigationPath.append(playlist)
+        case let .artist(artist):
+            self.navigationPath.append(artist)
+        }
+    }
+
+    private func playSectionItem(_ item: HomeSectionItem) {
+        switch item {
+        case let .song(song):
+            Task {
+                await self.playerService.playWithRadio(song: song)
+            }
+        case let .album(album):
+            SongActionsHelper.playAlbum(
+                album,
+                client: self.viewModel.client,
+                playerService: self.playerService
+            )
+        case let .playlist(playlist):
+            SongActionsHelper.playPlaylist(
+                playlist,
+                client: self.viewModel.client,
+                playerService: self.playerService
+            )
+        case let .artist(artist):
+            self.navigationPath.append(artist)
+        }
+    }
+
+    private func navigateSectionItem(_ item: HomeSectionItem) {
+        switch item {
+        case let .song(song):
+            if let album = song.album, album.hasNavigableId {
+                let playlist = Playlist(
+                    id: album.id,
+                    title: album.title,
+                    description: nil,
+                    thumbnailURL: album.thumbnailURL ?? song.thumbnailURL,
+                    trackCount: album.trackCount,
+                    author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
+                )
+                self.navigationPath.append(playlist)
+            } else if let artist = song.artists.first(where: { $0.hasNavigableId }) {
+                self.navigationPath.append(artist)
+            } else {
+                Task { await self.playerService.playWithRadio(song: song) }
+            }
+        case let .album(album):
+            let playlist = Playlist(
+                id: album.id,
+                title: album.title,
+                description: nil,
+                thumbnailURL: album.thumbnailURL,
+                trackCount: album.trackCount,
+                author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
+            )
+            self.navigationPath.append(playlist)
+        case let .playlist(playlist):
+            self.navigationPath.append(playlist)
+        case let .artist(artist):
+            self.navigationPath.append(artist)
         }
     }
 
@@ -223,14 +421,13 @@ struct HomeView: View {
 
         case let .album(album):
             Button {
-                self.playItem(item, in: HomeSection(id: "", title: "", items: []), at: 0)
+                self.playSectionItem(item)
             } label: {
                 Label(String(localized: "View Album"), systemImage: "square.stack")
             }
 
             Divider()
 
-            // Play / Play Next / Add to Queue for albums
             Button {
                 SongActionsHelper.playAlbum(
                     album,
@@ -304,7 +501,6 @@ struct HomeView: View {
     private static let thumbnailDisplaySize = CGSize(width: 160, height: 160)
 
     private func prefetchImagesAsync(for section: HomeSection) async {
-        // Early exit if task is cancelled
         guard !Task.isCancelled else { return }
 
         let urls = section.items.prefix(6).compactMap { $0.thumbnailURL?.highQualityThumbnailURL }
@@ -315,36 +511,6 @@ struct HomeView: View {
             targetSize: Self.thumbnailDisplaySize,
             maxConcurrent: 2
         )
-    }
-
-    // MARK: - Actions
-
-    private func playItem(_ item: HomeSectionItem, in _: HomeSection, at _: Int) {
-        switch item {
-        case let .song(song):
-            // Play the song and fetch similar songs (radio queue) in the background
-            Task {
-                await self.playerService.playWithRadio(song: song)
-            }
-        case let .playlist(playlist):
-            // Navigate to playlist detail
-            self.navigationPath.append(playlist)
-        case let .album(album):
-            // For now, we'll create a playlist-like navigation for albums
-            // In a full implementation, we'd have an AlbumDetailView
-            let playlist = Playlist(
-                id: album.id,
-                title: album.title,
-                description: nil,
-                thumbnailURL: album.thumbnailURL,
-                trackCount: album.trackCount,
-                author: Artist.inline(name: album.artistsDisplay, namespace: "album-artist")
-            )
-            self.navigationPath.append(playlist)
-        case let .artist(artist):
-            // Navigate to artist detail
-            self.navigationPath.append(artist)
-        }
     }
 }
 
