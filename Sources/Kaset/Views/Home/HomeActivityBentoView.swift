@@ -364,9 +364,18 @@ private struct JumpBackInTrackRowView: View {
     }
 
     var body: some View {
-        Button(action: self.onCardClick) {
-            HStack(spacing: 10) {
-                // Square Artwork flush with rounded corners & active liquid glass indicator
+        HStack(spacing: 10) {
+            // Square Artwork Button: Always plays the item (song, playlist, album)
+            Button {
+                if self.isCurrentlyPlaying {
+                    Task {
+                        await self.playerService.seek(to: 0)
+                        await self.playerService.resume()
+                    }
+                } else {
+                    self.onQuickPlay()
+                }
+            } label: {
                 ZStack {
                     if let url = self.item.thumbnailURL?.highQualityThumbnailURL ?? self.item.thumbnailURL {
                         CachedAsyncImage(
@@ -397,7 +406,7 @@ private struct JumpBackInTrackRowView: View {
                             }
                     }
 
-                    if self.isQuickPlayable, self.isHovering, !self.isCurrentlyPlaying {
+                    if self.isHovering, !self.isCurrentlyPlaying {
                         // Hover Play Icon over Artwork
                         Circle()
                             .fill(.black.opacity(0.55))
@@ -413,8 +422,11 @@ private struct JumpBackInTrackRowView: View {
                 }
                 .frame(width: Self.artworkSize, height: Self.artworkSize)
                 .clipShape(.rect(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
 
-                // Title & Subtitle
+            // Body Button (Title & Subtitle): Navigates to playlist/album or plays song
+            Button(action: self.onCardClick) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(self.item.title)
                         .font(.system(size: 13, weight: .medium))
@@ -429,23 +441,24 @@ private struct JumpBackInTrackRowView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .frame(width: 290, height: Self.rowHeight)
-            .compatGlass(interactive: true, in: .rect(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(self.isHovering ? Color.white.opacity(0.18) : Color.white.opacity(0.06), lineWidth: 1)
-            )
-            .shadow(
-                color: self.isHovering ? .black.opacity(0.15) : .clear,
-                radius: self.isHovering ? 6 : 0,
-                x: 0,
-                y: self.isHovering ? 2 : 0
-            )
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .frame(width: 290, height: Self.rowHeight)
+        .compatGlass(interactive: true, in: .rect(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(self.isHovering ? Color.white.opacity(0.18) : Color.white.opacity(0.06), lineWidth: 1)
+        )
+        .shadow(
+            color: self.isHovering ? .black.opacity(0.15) : .clear,
+            radius: self.isHovering ? 6 : 0,
+            x: 0,
+            y: self.isHovering ? 2 : 0
+        )
         .scaleEffect(self.isHovering ? 1.012 : 1.0)
         .animation(AppAnimation.quick, value: self.isHovering)
         .onHover { hovering in
