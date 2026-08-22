@@ -15,6 +15,7 @@ struct HomeArtistPortraitsView: View {
     let artists: [Artist]
     let onNavigateArtist: (Artist) -> Void
     var contentInset: CGFloat = DetailContentLayout.horizontalInset
+    var contextMenu: ((Artist) -> AnyView)?
 
     var body: some View {
         CarouselShelfSection(
@@ -31,7 +32,8 @@ struct HomeArtistPortraitsView: View {
         } itemContent: { artist in
             HomeArtistAvatarItemView(
                 artist: artist,
-                onNavigate: { self.onNavigateArtist(artist) }
+                onNavigate: { self.onNavigateArtist(artist) },
+                contextMenu: self.contextMenu
             )
         }
     }
@@ -42,6 +44,7 @@ struct HomeArtistPortraitsView: View {
 private struct HomeArtistAvatarItemView: View {
     let artist: Artist
     let onNavigate: () -> Void
+    var contextMenu: ((Artist) -> AnyView)?
 
     @State private var isHovering = false
 
@@ -111,5 +114,10 @@ private struct HomeArtistAvatarItemView: View {
             }
         }
         .accessibilityLabel(String(localized: "Artist: \(self.artist.name)"))
+        .contextMenu {
+            if let contextMenu {
+                contextMenu(self.artist)
+            }
+        }
     }
 }

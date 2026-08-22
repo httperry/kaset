@@ -34,7 +34,7 @@ struct HomeContentEngineTests {
         #expect(provisioned.heroItem?.badgeText == "SUPERMIX")
     }
 
-    @Test("Selects Jump Back In Bento with 1 primary and up to 4 secondary items")
+    @Test("Selects Jump Back In Bento with primary and secondary rotation items")
     func selectsJumpBackInBento() {
         let affinityEngine = UserAffinityEngine(skipPersistence: true)
 
@@ -55,7 +55,7 @@ struct HomeContentEngineTests {
 
         #expect(provisioned.jumpBackIn != nil)
         #expect(provisioned.jumpBackIn?.primaryItem.title == "After Hours")
-        #expect(provisioned.jumpBackIn?.secondaryItems.count == 4)
+        #expect(provisioned.jumpBackIn?.secondaryItems.count == 5)
     }
 
     @Test("Classifies raw sections into typed shelf contents")

@@ -404,6 +404,7 @@ private extension PlayerService {
             }
             self.isAwaitingPlaybackConfirmation = false
             self.confirmPlaybackStarted()
+            self.throttlePeriodicPersistence()
         } else {
             self.isAwaitingPlaybackConfirmation = false
             switch self.state {
@@ -419,6 +420,15 @@ private extension PlayerService {
         if duration > 0, progress >= duration - 2, previousProgress < duration - 2 {
             self.songNearingEnd = true
         }
+    }
+
+    func throttlePeriodicPersistence() {
+        let now = ContinuousClock.now
+        if let last = self.lastPeriodicPersistenceInstant, now - last < .seconds(4) {
+            return
+        }
+        self.lastPeriodicPersistenceInstant = now
+        self.saveQueueForPersistence()
     }
 
     func reconcileRestoredPlaybackState(

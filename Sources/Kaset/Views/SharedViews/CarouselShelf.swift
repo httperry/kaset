@@ -55,8 +55,9 @@ struct CarouselShelf<Content: View>: View {
                         .frame(width: self.contentInset)
                 }
             }
-            .padding(.vertical, 14)
+            .padding(.vertical, 4)
         }
+        .scrollClipDisabled()
         .scrollPosition(self.$scrollPosition)
         .onScrollGeometryChange(for: CarouselShelfScrollMetrics.self) { geometry in
             CarouselShelfScrollMetrics(geometry: geometry)

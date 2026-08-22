@@ -65,10 +65,11 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
     let artistSubtitle: String
     let editorialDescription: String?
     let thumbnailURL: URL?
-    let artistCoverURL: URL?
+    var artistCoverURL: URL?
     let featuredArtistId: String?
     let badgeText: String?
     let playTarget: HomePlayTarget
+    var multiTrackArtworks: [URL]?
 
     init(
         id: String,
@@ -79,7 +80,8 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
         artistCoverURL: URL? = nil,
         featuredArtistId: String? = nil,
         badgeText: String? = nil,
-        playTarget: HomePlayTarget
+        playTarget: HomePlayTarget,
+        multiTrackArtworks: [URL]? = nil
     ) {
         self.id = id
         self.title = title
@@ -90,7 +92,18 @@ struct HomeHeroItemPayload: Identifiable, Equatable, Sendable {
         self.featuredArtistId = featuredArtistId
         self.badgeText = badgeText
         self.playTarget = playTarget
+        self.multiTrackArtworks = multiTrackArtworks
     }
+}
+
+// MARK: - HomeHeroArtworkStore
+
+/// Global in-memory cache of resolved high-res artist backdrops and multi-track playlist slices.
+/// Retains resolved assets across tab switches to prevent view remount flickering.
+@MainActor
+enum HomeHeroArtworkStore {
+    static var artistBanners: [String: URL] = [:]
+    static var playlistArtworks: [String: [URL]] = [:]
 }
 
 // MARK: - HomeBentoItemPayload

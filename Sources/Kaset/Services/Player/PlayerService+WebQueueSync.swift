@@ -105,7 +105,8 @@ extension PlayerService {
     }
 
     private func keepQueueSongVisible(_ song: Song, thumbnailUrl: String) {
-        let intendedThumbnailURL = URL(string: thumbnailUrl) ?? song.thumbnailURL
+        let incomingURL = URL(string: thumbnailUrl)
+        let intendedThumbnailURL = Self.preferHighQualitySquareThumbnail(existing: song.thumbnailURL, incoming: incomingURL) ?? song.thumbnailURL
         self.currentTrack = Song(
             id: song.id,
             title: song.title,
@@ -706,27 +707,47 @@ extension PlayerService {
 
         // The WebView can resend the same track when only its volatile byline tail
         // changes. Keep the resolved metadata and status, but still accept a newly
-        // available thumbnail from the DOM.
         guard trackChanged else {
             guard let currentTrack = self.currentTrack,
-                  let thumbnailURL,
-                  currentTrack.thumbnailURL != thumbnailURL
+                  let thumbnailURL
             else { return }
+            let resolvedThumbnailURL = Self.preferHighQualitySquareThumbnail(
+                existing: currentTrack.thumbnailURL,
+                incoming: thumbnailURL
+            )
+            guard currentTrack.thumbnailURL != resolvedThumbnailURL else { return }
             self.currentTrack = currentTrack.replacingDisplayMetadata(
                 title: currentTrack.title,
                 artists: currentTrack.artists,
-                thumbnailURL: thumbnailURL
+                thumbnailURL: resolvedThumbnailURL
             )
             return
         }
 
+        self.applyTrackChangedMetadata(
+            resolvedVideoId: resolvedVideoId,
+            title: title,
+            artist: artistObj,
+            thumbnailURL: thumbnailURL
+        )
+    }
+
+    private func applyTrackChangedMetadata(
+        resolvedVideoId: String,
+        title: String,
+        artist: Artist,
+        thumbnailURL: URL?
+    ) {
+        let queueThumbnailURL = self.queueEntries.first(where: { $0.song.videoId == resolvedVideoId })?.song.thumbnailURL
+        let resolvedThumbnail = Self.preferHighQualitySquareThumbnail(existing: queueThumbnailURL, incoming: thumbnailURL)
+
         self.currentTrack = Song(
             id: resolvedVideoId,
             title: title,
-            artists: [artistObj],
+            artists: [artist],
             album: nil,
             duration: self.observedDuration(for: resolvedVideoId),
-            thumbnailURL: thumbnailURL,
+            thumbnailURL: resolvedThumbnail,
             videoId: resolvedVideoId
         )
 
@@ -754,12 +775,42 @@ extension PlayerService {
         // identity resolves independently. Preserve navigable artists and ignore
         // transient empty observations without pinning generated parser placeholders.
         let resolvedTitle = Self.resolvedObservedTitle(current: currentTrack.title, observed: title)
+        let resolvedThumbnailURL = Self.preferHighQualitySquareThumbnail(
+            existing: currentTrack.thumbnailURL,
+            incoming: thumbnailURL
+        )
         self.currentTrack = currentTrack.replacingDisplayMetadata(
             title: resolvedTitle,
             artists: hasResolvedArtists || observedArtistIsEmpty ? currentTrack.artists : [artist],
-            thumbnailURL: thumbnailURL ?? currentTrack.thumbnailURL
+            thumbnailURL: resolvedThumbnailURL
         )
         return true
+    }
+
+    /// Prefers high-resolution 1:1 square album covers (hosted on googleusercontent.com / ggpht.com)
+    /// over YouTube video thumbnails (ytimg.com) which have baked-in 4:3 or 16:9 pillar/letterbox bars.
+    static func preferHighQualitySquareThumbnail(existing: URL?, incoming: URL?) -> URL? {
+        guard let existing else { return incoming }
+        guard let incoming else { return existing }
+        if existing == incoming {
+            return existing
+        }
+
+        let existingIsSquareAlbumArt = existing.host?.contains("googleusercontent.com") == true
+            || existing.host?.contains("ggpht.com") == true
+        let incomingIsVideoThumbnail = incoming.host?.contains("ytimg.com") == true
+
+        if existingIsSquareAlbumArt && incomingIsVideoThumbnail {
+            return existing
+        }
+
+        let incomingIsSquareAlbumArt = incoming.host?.contains("googleusercontent.com") == true
+            || incoming.host?.contains("ggpht.com") == true
+        if incomingIsSquareAlbumArt {
+            return incoming
+        }
+
+        return existing
     }
 
     private static func resolvedObservedTitle(current: String, observed: String) -> String {

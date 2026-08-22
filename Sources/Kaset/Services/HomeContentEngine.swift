@@ -28,13 +28,20 @@ enum HomeContentEngine {
         // 1. Select Multi-Item Hero Spotlights
         let heroItems = Self.selectHeroItems(from: rawSections, affinityEngine: affinityEngine)
 
-        // 2. Select Jump Back In Recent Items
+        // 2. Select Jump Back In Recent Items (Consolidating Jump Back In, Listen Again, and Recent Rotation)
         let jumpBackIn = Self.selectJumpBackIn(from: rawSections, affinityEngine: affinityEngine)
 
         // 3. Process & Classify Downstream Shelves
         var curatedShelves: [HomeCuratedShelfPayload] = []
 
         for section in rawSections {
+            let lower = section.title.lowercased()
+            // Consolidate: Skip "Listen again" and "Jump back in" from downstream shelves
+            if lower.contains("listen again") || lower.contains("jump back in") {
+                Self.logger.info("HomeContentEngine consolidated section into top Jump Back In: \(section.title)")
+                continue
+            }
+
             // Apply Promotional Filter
             if affinityEngine.isPromotionalShelf(title: section.title, items: section.items) {
                 Self.logger.info("HomeContentEngine dropped promotional section: \(section.title)")
@@ -194,12 +201,12 @@ enum HomeContentEngine {
         from sections: [HomeSection],
         affinityEngine: UserAffinityEngine
     ) -> HomeBentoItemPayload? {
-        // Collect candidate items from "Listen again", "Jump back in", "Library", "Quick picks"
+        // Collect candidate items from "Listen again", "Jump back in", "Forgotten favorites", "Mixed for you", "Quick picks", "Recent"
         var candidateItems: [HomeSectionItem] = []
 
         for section in sections {
             let lower = section.title.lowercased()
-            if lower.contains("listen again") || lower.contains("jump back in") || lower.contains("library") || lower.contains("quick picks") {
+            if lower.contains("listen again") || lower.contains("jump back in") || lower.contains("forgotten favorites") || lower.contains("quick picks") || lower.contains("mixed for you") || lower.contains("recent") || lower.contains("library") {
                 candidateItems.append(contentsOf: section.items)
             }
         }
@@ -221,7 +228,7 @@ enum HomeContentEngine {
 
         guard !uniqueCandidates.isEmpty else { return nil }
 
-        // Sort candidates by composite affinity score
+        // Sort candidates by composite affinity score and recency
         uniqueCandidates.sort { lhs, rhs in
             let lhsScore = affinityEngine.computeAffinityScore(videoId: lhs.videoId, artist: lhs.subtitle, albumId: lhs.album?.id)
             let rhsScore = affinityEngine.computeAffinityScore(videoId: rhs.videoId, artist: rhs.subtitle, albumId: rhs.album?.id)
@@ -256,9 +263,15 @@ enum HomeContentEngine {
         let primaryItem = albumPlaylistCandidates.first ?? uniqueCandidates[0]
         affinityEngine.recordBentoPrimaryShown(itemId: primaryItem.id)
 
-        // Secondary items: next 4 distinct items with diversity constraint (no more than 2 from same artist)
+        // Secondary items: collect diverse items with diversity constraint (no more than 2-3 from same artist)
         var secondaryItems: [HomeSectionItem] = []
         var artistCounts: [String: Int] = [:]
+
+        // Seed artist count from primary item
+        let primaryArtistKey = primaryItem.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !primaryArtistKey.isEmpty {
+            artistCounts[primaryArtistKey] = 1
+        }
 
         for item in uniqueCandidates where item.id != primaryItem.id {
             let artistKey = item.subtitle?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -269,7 +282,7 @@ enum HomeContentEngine {
                     artistCounts[artistKey] = currentCount + 1
                 }
             }
-            if secondaryItems.count == 4 {
+            if secondaryItems.count >= 19 {
                 break
             }
         }

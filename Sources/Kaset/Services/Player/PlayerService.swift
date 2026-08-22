@@ -344,6 +344,9 @@ final class PlayerService: NSObject, PlayerServiceProtocol {
     /// Whether a restored load should automatically resume after seeking to the saved position.
     var shouldAutoResumeAfterRestoredLoad: Bool = false
 
+    /// Last time playback progress was periodically written to disk.
+    var lastPeriodicPersistenceInstant: ContinuousClock.Instant?
+
     /// Like status of the current track.
     var currentTrackLikeStatus: LikeStatus = .indifferent
 

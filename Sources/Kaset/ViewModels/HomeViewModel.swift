@@ -74,7 +74,13 @@ final class HomeViewModel {
             let response = try await client.getHome(forceRefresh: forceRefresh)
             guard generation == self.loadGeneration else { return }
             self.sections = response.sections
-            self.provisionedContent = HomeContentEngine.process(rawSections: self.sections)
+            var provisioned = HomeContentEngine.process(rawSections: self.sections)
+
+            // Upfront asset preloading: decode hero artworks, diagonal slices, and palettes into cache
+            await self.preloadHeroAssets(for: &provisioned)
+
+            guard generation == self.loadGeneration else { return }
+            self.provisionedContent = provisioned
             self.hasMoreSections = self.client.hasMoreHomeSections
             self.loadingState = .loaded
             let sectionCount = self.sections.count
@@ -203,5 +209,65 @@ final class HomeViewModel {
         for waiter in waiters {
             waiter.resume()
         }
+    }
+
+    // MARK: - Upfront Hero Asset Preloading
+
+    private func preloadHeroAssets(for provisioned: inout HomeProvisionedContent) async {
+        guard !provisioned.heroItems.isEmpty else { return }
+
+        var enrichedHeroItems: [HomeHeroItemPayload] = []
+
+        for item in provisioned.heroItems {
+            var updatedItem = item
+
+            // 1. Preload main card thumbnail and extract color palette upfront
+            if let url = item.thumbnailURL {
+                _ = await ColorExtractor.cachedPalette(for: url)
+                _ = await ImageCache.shared.image(for: url, targetSize: CGSize(width: 320, height: 320))
+            }
+
+            // 2. Preload high-res artist banners and playlist track thumbnails
+            switch item.playTarget {
+            case .playlist:
+                if let res = try? await self.client.getPlaylist(id: item.playTarget.id) {
+                    let trackURLs = res.detail.tracks.compactMap { $0.thumbnailURL?.ultraHighQualityThumbnailURL ?? $0.thumbnailURL }
+                    if !trackURLs.isEmpty {
+                        HomeHeroArtworkStore.playlistArtworks[item.id] = trackURLs
+                        updatedItem.multiTrackArtworks = trackURLs
+                    }
+                    for url in trackURLs.prefix(5) {
+                        _ = await ImageCache.shared.image(for: url, targetSize: CGSize(width: 1200, height: 1200))
+                    }
+                }
+                if let artistId = item.featuredArtistId ?? item.playTarget.artist?.id, !artistId.isEmpty {
+                    if let artist = try? await self.client.getArtist(id: artistId),
+                       let bannerURL = artist.thumbnailURL?.ultraHighQualityThumbnailURL
+                    {
+                        HomeHeroArtworkStore.artistBanners[item.id] = bannerURL
+                        updatedItem.artistCoverURL = bannerURL
+                        _ = await ImageCache.shared.image(for: bannerURL, targetSize: CGSize(width: 1920, height: 1080))
+                    }
+                }
+            case .song, .album, .artist:
+                if let artistId = item.featuredArtistId ?? item.playTarget.artist?.id, !artistId.isEmpty {
+                    if let artist = try? await self.client.getArtist(id: artistId),
+                       let bannerURL = artist.thumbnailURL?.ultraHighQualityThumbnailURL
+                    {
+                        HomeHeroArtworkStore.artistBanners[item.id] = bannerURL
+                        updatedItem.artistCoverURL = bannerURL
+                        _ = await ImageCache.shared.image(for: bannerURL, targetSize: CGSize(width: 1920, height: 1080))
+                    }
+                }
+            }
+
+            enrichedHeroItems.append(updatedItem)
+        }
+
+        provisioned = HomeProvisionedContent(
+            heroItems: enrichedHeroItems,
+            jumpBackIn: provisioned.jumpBackIn,
+            curatedShelves: provisioned.curatedShelves
+        )
     }
 }

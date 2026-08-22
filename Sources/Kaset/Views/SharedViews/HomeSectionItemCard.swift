@@ -9,6 +9,7 @@ struct HomeSectionItemCard: View {
     let playAction: (() -> Void)?
     let action: () -> Void
     @Environment(AuthService.self) private var authService
+    @Environment(PlayerService.self) private var playerService
 
     /// Card dimensions.
     private static let squareThumbnailSize = CGSize(width: 160, height: 160)
@@ -18,6 +19,30 @@ struct HomeSectionItemCard: View {
     /// Hover state for play overlay.
     @State private var isHovering = false
     @State private var failedThumbnailURLs: Set<URL> = []
+
+    private var isCurrentlyPlaying: Bool {
+        guard let currentTrack = self.playerService.currentTrack else { return false }
+        if let videoId = self.item.videoId, videoId == currentTrack.videoId {
+            return true
+        }
+        if case let .song(song) = self.item, song.videoId == currentTrack.videoId {
+            return true
+        }
+        let itemTitle = Self.normalizeForComparison(self.item.title)
+        let trackTitle = Self.normalizeForComparison(currentTrack.title)
+        if !itemTitle.isEmpty, !trackTitle.isEmpty {
+            if itemTitle == trackTitle || itemTitle.contains(trackTitle) || trackTitle.contains(itemTitle) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func normalizeForComparison(_ str: String) -> String {
+        str.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
+    }
 
     init(
         item: HomeSectionItem,
@@ -45,10 +70,12 @@ struct HomeSectionItemCard: View {
     private var cardContent: some View {
         ZStack(alignment: .topLeading) {
             Button(action: self.action) {
-                if let rank {
-                    self.chartContent(rank: rank)
-                } else {
-                    self.regularContent
+                Group {
+                    if let rank = self.rank {
+                        self.chartContent(rank: rank)
+                    } else {
+                        self.regularContent
+                    }
                 }
             }
             .buttonStyle(.interactiveCard(showShadow: false, hoverScale: 1))
@@ -78,6 +105,33 @@ struct HomeSectionItemCard: View {
             self.thumbnail
             self.titleAndSubtitle
         }
+        .padding(6)
+        .background {
+            if self.isCurrentlyPlaying {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .compatGlass(
+                        interactive: false,
+                        in: .rect(cornerRadius: 14, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(0.85),
+                                        .white.opacity(0.35),
+                                        .white.opacity(0.10),
+                                        .white.opacity(0.60),
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.2
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.20), radius: 6, x: 0, y: 2)
+            }
+        }
     }
 
     // MARK: - Chart Card Content
@@ -87,6 +141,33 @@ struct HomeSectionItemCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 self.thumbnail
                 self.titleAndSubtitle
+            }
+            .padding(6)
+            .background {
+                if self.isCurrentlyPlaying {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .compatGlass(
+                            interactive: false,
+                            in: .rect(cornerRadius: 14, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            .white.opacity(0.85),
+                                            .white.opacity(0.35),
+                                            .white.opacity(0.10),
+                                            .white.opacity(0.60),
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.20), radius: 6, x: 0, y: 2)
+                }
             }
 
             // Rank badge overlay with adaptive styling
@@ -127,8 +208,12 @@ struct HomeSectionItemCard: View {
         .frame(width: self.thumbnailSize.width, height: self.thumbnailSize.height)
         .clipShape(.rect(cornerRadius: 8))
         .overlay {
-            // Play overlay on hover (for songs)
-            if case .song = self.item, self.isHovering {
+            if self.isCurrentlyPlaying {
+                ActivePlayingArtworkBadgeOverlay(
+                    isPlaying: self.playerService.isPlaying
+                )
+            } else if case .song = self.item, self.isHovering {
+                // Play overlay on hover (for songs)
                 SongCoverPlayOverlay(size: Self.playButtonSize)
                     .transition(.opacity)
             }

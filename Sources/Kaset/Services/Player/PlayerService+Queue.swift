@@ -941,25 +941,7 @@ extension PlayerService {
         // Smart Shuffle suggestions are ephemeral (regenerated from live context), so never
         // persist them. Strip before saving, keeping the currently-playing track if it is one.
         let activeQueueEntryID = self.queueEntryIDOwningCurrentPlayback
-        let persistedEntries: [QueueEntry]
-        let currentID: UUID?
-        if let activeQueueEntryID {
-            currentID = activeQueueEntryID
-            persistedEntries = Self.stripSuggested(
-                from: self.queueEntries,
-                keepingCurrentID: activeQueueEntryID
-            )
-        } else if let currentTrack = self.currentTrack {
-            let standaloneEntry = QueueEntry(id: UUID(), song: currentTrack)
-            currentID = standaloneEntry.id
-            persistedEntries = [standaloneEntry]
-        } else {
-            currentID = nil
-            persistedEntries = Self.stripSuggested(
-                from: self.queueEntries,
-                keepingCurrentID: nil
-            )
-        }
+        let (persistedEntries, currentID) = self.resolvePersistableEntries(activeQueueEntryID: activeQueueEntryID)
         let persistableQueue = persistedEntries.map(\.song)
         let persistedEntryIDs = Set(persistedEntries.map(\.id))
         let preShuffleEntries = self.queueOrderBeforeShuffle?.filter {
@@ -1024,6 +1006,7 @@ extension PlayerService {
             self.queuePersistenceDefaults.set(queueData, forKey: self.savedQueueKey)
             self.queuePersistenceDefaults.set(safeIndex, forKey: self.savedQueueIndexKey)
             self.queuePersistenceDefaults.set(sessionData, forKey: self.savedPlaybackSessionKey)
+            self.queuePersistenceDefaults.synchronize()
             self.lastSavedPlaybackSessionSignature = sessionData
             self.queuePersistenceWriteCountForTesting += 1
             self.restoredPlaybackSessionOwnerScope = ownerScope
@@ -1037,6 +1020,23 @@ extension PlayerService {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         return encoder
+    }
+
+    private func resolvePersistableEntries(activeQueueEntryID: UUID?) -> (entries: [QueueEntry], currentID: UUID?) {
+        if let activeQueueEntryID {
+            return (
+                Self.stripSuggested(from: self.queueEntries, keepingCurrentID: activeQueueEntryID),
+                activeQueueEntryID
+            )
+        } else if let currentTrack = self.currentTrack {
+            let standaloneEntry = QueueEntry(id: UUID(), song: currentTrack)
+            return ([standaloneEntry], standaloneEntry.id)
+        } else {
+            return (
+                Self.stripSuggested(from: self.queueEntries, keepingCurrentID: nil),
+                nil
+            )
+        }
     }
 
     private func persistedCurrentIndex(currentID: UUID?, entries: [QueueEntry]) -> Int {

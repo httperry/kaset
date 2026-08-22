@@ -16,6 +16,7 @@ struct HomeVideoPerformancesView: View {
     let onPlayVideo: (Song) -> Void
     let onNavigateVideo: (Song) -> Void
     var contentInset: CGFloat = DetailContentLayout.horizontalInset
+    var contextMenu: ((Song) -> AnyView)?
 
     var body: some View {
         CarouselShelfSection(
@@ -33,7 +34,8 @@ struct HomeVideoPerformancesView: View {
             HomeVideoCardItemView(
                 song: song,
                 onPlay: { self.onPlayVideo(song) },
-                onNavigate: { self.onNavigateVideo(song) }
+                onNavigate: { self.onNavigateVideo(song) },
+                contextMenu: self.contextMenu
             )
         }
     }
@@ -45,11 +47,34 @@ private struct HomeVideoCardItemView: View {
     let song: Song
     let onPlay: () -> Void
     let onNavigate: () -> Void
+    var contextMenu: ((Song) -> AnyView)?
 
+    @Environment(PlayerService.self) private var playerService
     @State private var isHovering = false
 
     private static let cardWidth: CGFloat = 270
     private static let cardHeight: CGFloat = 152
+
+    private var isCurrentlyPlaying: Bool {
+        guard let currentTrack = self.playerService.currentTrack else { return false }
+        if self.song.videoId == currentTrack.videoId {
+            return true
+        }
+        let itemTitle = Self.normalizeForComparison(self.song.title)
+        let trackTitle = Self.normalizeForComparison(currentTrack.title)
+        if !itemTitle.isEmpty, !trackTitle.isEmpty {
+            if itemTitle == trackTitle || itemTitle.contains(trackTitle) || trackTitle.contains(itemTitle) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func normalizeForComparison(_ str: String) -> String {
+        str.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
+    }
 
     var body: some View {
         Button(action: self.onPlay) {
@@ -145,5 +170,10 @@ private struct HomeVideoCardItemView: View {
             }
         }
         .accessibilityLabel(String(localized: "Video: \(self.song.title) by \(self.song.artistsDisplay)"))
+        .contextMenu {
+            if let contextMenu {
+                contextMenu(self.song)
+            }
+        }
     }
 }

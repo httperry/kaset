@@ -164,7 +164,8 @@ struct Song: Identifiable, Codable, Hashable {
 
     /// YouTube's public video thumbnail as a fallback when the API doesn't provide one.
     var fallbackThumbnailURL: URL? {
-        URL(string: "https://i.ytimg.com/vi/\(self.videoId)/hqdefault.jpg")
+        URL(string: "https://i.ytimg.com/vi/\(self.videoId)/sddefault.jpg")
+            ?? URL(string: "https://i.ytimg.com/vi/\(self.videoId)/hqdefault.jpg")
     }
 
     /// YouTube's public high-quality 16:9 thumbnail for wide video cards.

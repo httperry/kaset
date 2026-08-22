@@ -16,6 +16,7 @@ struct HomeMediumCardsView: View {
     let onPlayItem: (HomeSectionItem) -> Void
     let onNavigateItem: (HomeSectionItem) -> Void
     var contentInset: CGFloat = DetailContentLayout.horizontalInset
+    var contextMenu: ((HomeSectionItem) -> AnyView)?
 
     var body: some View {
         CarouselShelfSection(
@@ -33,7 +34,8 @@ struct HomeMediumCardsView: View {
             HomeMediumCardItemView(
                 item: item,
                 onPlay: { self.onPlayItem(item) },
-                onNavigate: { self.onNavigateItem(item) }
+                onNavigate: { self.onNavigateItem(item) },
+                contextMenu: self.contextMenu
             )
         }
     }
@@ -45,11 +47,37 @@ private struct HomeMediumCardItemView: View {
     let item: HomeSectionItem
     let onPlay: () -> Void
     let onNavigate: () -> Void
+    var contextMenu: ((HomeSectionItem) -> AnyView)?
 
+    @Environment(PlayerService.self) private var playerService
     @State private var isHovering = false
 
     private static let cardWidth: CGFloat = 175
     private static let artworkSize: CGFloat = 175
+
+    private var isCurrentlyPlaying: Bool {
+        guard let currentTrack = self.playerService.currentTrack else { return false }
+        if let videoId = self.item.videoId, videoId == currentTrack.videoId {
+            return true
+        }
+        if case let .song(song) = self.item, song.videoId == currentTrack.videoId {
+            return true
+        }
+        let itemTitle = Self.normalizeForComparison(self.item.title)
+        let trackTitle = Self.normalizeForComparison(currentTrack.title)
+        if !itemTitle.isEmpty, !trackTitle.isEmpty {
+            if itemTitle == trackTitle || itemTitle.contains(trackTitle) || trackTitle.contains(itemTitle) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func normalizeForComparison(_ str: String) -> String {
+        str.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
+    }
 
     private var isQuickPlayable: Bool {
         switch self.item {
@@ -68,7 +96,14 @@ private struct HomeMediumCardItemView: View {
         Button {
             switch self.item {
             case .song:
-                self.onPlay()
+                if self.isCurrentlyPlaying {
+                    Task {
+                        await self.playerService.seek(to: 0)
+                        await self.playerService.resume()
+                    }
+                } else {
+                    self.onPlay()
+                }
             case .album, .playlist, .artist:
                 self.onNavigate()
             }
@@ -105,7 +140,16 @@ private struct HomeMediumCardItemView: View {
 
                     // Hover Liquid Glass Play Button (only for playable items)
                     if self.isQuickPlayable, self.isHovering {
-                        Button(action: self.onPlay) {
+                        Button {
+                            if self.isCurrentlyPlaying {
+                                Task {
+                                    await self.playerService.seek(to: 0)
+                                    await self.playerService.resume()
+                                }
+                            } else {
+                                self.onPlay()
+                            }
+                        } label: {
                             Image(systemName: "play.fill")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundStyle(.primary)
@@ -124,12 +168,13 @@ private struct HomeMediumCardItemView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .strokeBorder(.white.opacity(0.12), lineWidth: 1)
                 )
-                .shadow(
-                    color: self.isHovering ? .black.opacity(0.24) : .black.opacity(0.10),
-                    radius: self.isHovering ? 14 : 6,
-                    x: 0,
-                    y: self.isHovering ? 6 : 2
-                )
+                .overlay {
+                    if self.isCurrentlyPlaying {
+                        ActivePlayingArtworkBadgeOverlay(
+                            isPlaying: self.playerService.isPlaying
+                        )
+                    }
+                }
 
                 // Title & Subtitle
                 VStack(alignment: .leading, spacing: 3) {
@@ -148,7 +193,40 @@ private struct HomeMediumCardItemView: View {
                 }
                 .frame(width: Self.cardWidth, alignment: .leading)
             }
-            .frame(width: Self.cardWidth)
+            .padding(6)
+            .background {
+                if self.isCurrentlyPlaying {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .compatGlass(
+                            interactive: false,
+                            in: .rect(cornerRadius: 16, style: .continuous)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [
+                                            .white.opacity(0.85),
+                                            .white.opacity(0.35),
+                                            .white.opacity(0.10),
+                                            .white.opacity(0.60),
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.2
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.20), radius: 6, x: 0, y: 2)
+                }
+            }
+            .frame(width: Self.cardWidth + 12)
+            .shadow(
+                color: self.isHovering ? .black.opacity(0.24) : .black.opacity(0.10),
+                radius: self.isHovering ? 14 : 6,
+                x: 0,
+                y: self.isHovering ? 6 : 2
+            )
         }
         .buttonStyle(.plain)
         .scaleEffect(self.isHovering ? 1.02 : 1.0)
@@ -159,6 +237,11 @@ private struct HomeMediumCardItemView: View {
             }
         }
         .accessibilityLabel(String(localized: "\(self.item.title), \(self.item.homeCardSubtitle ?? "")"))
+        .contextMenu {
+            if let contextMenu {
+                contextMenu(self.item)
+            }
+        }
     }
 
     private var placeholderIcon: String {

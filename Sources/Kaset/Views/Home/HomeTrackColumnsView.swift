@@ -16,6 +16,7 @@ struct HomeTrackColumnsView: View {
     let onPlaySong: (Song) -> Void
     let onNavigateSong: (Song) -> Void
     var contentInset: CGFloat = DetailContentLayout.horizontalInset
+    var contextMenu: ((Song) -> AnyView)?
 
     @Environment(AuthService.self) private var authService
 
@@ -59,7 +60,8 @@ struct HomeTrackColumnsView: View {
             song: song,
             onPlay: { self.onPlaySong(song) },
             onNavigate: { self.onNavigateSong(song) },
-            allowsActions: self.authService.hasPersonalAccount
+            allowsActions: self.authService.hasPersonalAccount,
+            contextMenu: self.contextMenu
         )
     }
 }
@@ -71,57 +73,60 @@ private struct HomeTrackRowView: View {
     let onPlay: () -> Void
     let onNavigate: () -> Void
     let allowsActions: Bool
+    var contextMenu: ((Song) -> AnyView)?
 
+    @Environment(PlayerService.self) private var playerService
     @State private var isHovering = false
 
+    private var isCurrentlyPlaying: Bool {
+        guard let currentTrack = self.playerService.currentTrack else { return false }
+        if self.song.videoId == currentTrack.videoId {
+            return true
+        }
+        let itemTitle = Self.normalizeForComparison(self.song.title)
+        let trackTitle = Self.normalizeForComparison(currentTrack.title)
+        if !itemTitle.isEmpty, !trackTitle.isEmpty {
+            if itemTitle == trackTitle || itemTitle.contains(trackTitle) || trackTitle.contains(itemTitle) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func normalizeForComparison(_ str: String) -> String {
+        str.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
+    }
+
     var body: some View {
-        Button(action: self.onPlay) {
+        Button {
+            if self.isCurrentlyPlaying {
+                Task {
+                    await self.playerService.seek(to: 0)
+                    await self.playerService.resume()
+                }
+            } else {
+                self.onPlay()
+            }
+        } label: {
             HStack(spacing: 12) {
                 // Thumbnail with Play Hover Overlay
-                ZStack {
-                    if let url = song.thumbnailURL?.highQualityThumbnailURL {
-                        CachedAsyncImage(
-                            url: url,
-                            targetSize: CGSize(width: 44, height: 44)
-                        ) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Rectangle()
-                                .fill(Color(nsColor: .controlBackgroundColor))
+                SongThumbnailView(song: self.song, size: 44, cornerRadius: 6)
+                    .overlay {
+                        if self.isHovering, !self.isCurrentlyPlaying {
+                            Circle()
+                                .fill(.black.opacity(0.55))
+                                .frame(width: 26, height: 26)
                                 .overlay {
-                                    Image(systemName: "music.note")
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(.secondary)
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .offset(x: 1)
                                 }
+                                .transition(.opacity)
                         }
-                    } else {
-                        Rectangle()
-                            .fill(Color(nsColor: .controlBackgroundColor))
-                            .overlay {
-                                Image(systemName: "music.note")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(.secondary)
-                            }
                     }
-
-                    // Hover Play Icon
-                    if self.isHovering {
-                        Circle()
-                            .fill(.black.opacity(0.55))
-                            .frame(width: 26, height: 26)
-                            .overlay {
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .offset(x: 1)
-                            }
-                            .transition(.opacity)
-                    }
-                }
-                .frame(width: 44, height: 44)
-                .clipShape(.rect(cornerRadius: 6))
 
                 // Song Title & Artist Subtitle
                 VStack(alignment: .leading, spacing: 3) {
@@ -166,6 +171,11 @@ private struct HomeTrackRowView: View {
             }
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let contextMenu {
+                contextMenu(self.song)
+            }
+        }
         .onHover { hovering in
             withAnimation(AppAnimation.quick) {
                 self.isHovering = hovering

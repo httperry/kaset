@@ -208,6 +208,13 @@ extension PlayerService {
             videoId: song.videoId,
             strategy: webLoadStrategy
         )
+        if self.currentTrack?.videoId == song.videoId,
+           self.isPendingRestoredLoadDeferred || self.pendingRestoredSeek != nil
+        {
+            self.logger.info("Song \(song.videoId) is current restored track; resuming from saved progress \(self.progress)")
+            await self.resume(intent: intent)
+            return
+        }
         let hasSameLogicalOwner = if let queueEntryID {
             queueEntryID == self.activePlaybackQueueEntryID
         } else {
@@ -517,6 +524,7 @@ extension PlayerService {
         } else {
             await self.evaluatePlayerCommand("pause")
         }
+        self.saveQueueForPersistence()
     }
 
     /// Resumes playback.

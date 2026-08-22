@@ -106,17 +106,16 @@ extension URL {
             }
         }
 
-        // 2. YouTube video thumbnail URLs (i.ytimg.com/vi/<id>/...) -> /hq720.jpg
+        // 2. YouTube video thumbnail URLs (i.ytimg.com/vi/<id>/...) -> /hqdefault.jpg
         if urlString.contains("ytimg.com") {
-            urlString = urlString.replacingOccurrences(of: "/default.jpg", with: "/hq720.jpg")
-            urlString = urlString.replacingOccurrences(of: "/mqdefault.jpg", with: "/hq720.jpg")
-            urlString = urlString.replacingOccurrences(of: "/hqdefault.jpg", with: "/hq720.jpg")
-            urlString = urlString.replacingOccurrences(of: "/sddefault.jpg", with: "/hq720.jpg")
             if urlString.contains("w60-h60") || urlString.contains("w120-h120") || urlString.contains("w226-h226") || urlString.contains("w544-h544") {
                 urlString = urlString.replacingOccurrences(of: "w60-h60", with: "w1200-h1200")
                 urlString = urlString.replacingOccurrences(of: "w120-h120", with: "w1200-h1200")
                 urlString = urlString.replacingOccurrences(of: "w226-h226", with: "w1200-h1200")
                 urlString = urlString.replacingOccurrences(of: "w544-h544", with: "w1200-h1200")
+            } else if urlString.contains("/default.jpg") || urlString.contains("/mqdefault.jpg") {
+                urlString = urlString.replacingOccurrences(of: "/default.jpg", with: "/hqdefault.jpg")
+                urlString = urlString.replacingOccurrences(of: "/mqdefault.jpg", with: "/hqdefault.jpg")
             }
         }
 

@@ -196,8 +196,9 @@ struct PlayerBar: View { // swiftlint:disable:this type_body_length
 
     private func artworkGlowSources(for track: Song) -> [URL] {
         self.uniqueURLs([
-            track.fallbackThumbnailURL,
             track.thumbnailURL?.highQualityThumbnailURL,
+            track.thumbnailURL,
+            track.fallbackThumbnailURL,
         ])
     }
 

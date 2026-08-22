@@ -884,7 +884,9 @@ struct MainWindow: View { // swiftlint:disable:this type_body_length
             switch item {
             case .home:
                 if let vm = homeViewModel {
-                    HomeView(viewModel: vm)
+                    HomeView(viewModel: vm, onNavigateToHistory: {
+                        self.navigationSelection = .history
+                    })
                 }
             case .explore:
                 if let vm = exploreViewModel {
