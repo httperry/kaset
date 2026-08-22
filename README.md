@@ -1,93 +1,138 @@
-<h1 align="center">Kaset</h1>
+# <img src="docs/screenshots/app-icon.png" width="40" height="40" valign="middle"> Kaset
 
-<p align="center">A native macOS client for YouTube Music and YouTube, built with Swift and SwiftUI.</p>
+A native macOS client for YouTube Music and YouTube, built with Swift and SwiftUI.
 
-<p align="center">
-  <a href="https://trendshift.io/repositories/16570?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-16570"><img src="https://trendshift.io/api/badge/repositories/16570" alt="sozercan/kaset | Trendshift" width="200" height="44"/></a>
-</p>
+---
+
+## Design Evolution: Before & After
 
 <table>
   <tr>
-    <th>YouTube Music</th>
-    <th>YouTube</th>
+    <th width="50%">Original Upstream Interface</th>
+    <th width="50%">Redesigned Home Interface</th>
   </tr>
   <tr>
-    <td><img src="docs/screenshot-ytm.png" alt="Kaset YouTube Music screenshot"></td>
-    <td><img src="docs/screenshot-yt.png" alt="Kaset YouTube screenshot"></td>
+    <td><img src="docs/screenshots/homescreen-legacy.png" alt="Original Interface"></td>
+    <td><img src="docs/screenshots/homescreen-dark.png" alt="Redesigned Interface"></td>
+  </tr>
+  <tr>
+    <td valign="top">Standard flat list layout with basic grid carousels.</td>
+    <td valign="top">Cinematic Hero spotlight stage, Jump Back In bento shelf, Liquid Glass playing platters, and real-time audio visualizer.</td>
   </tr>
 </table>
 
-## Features
+---
 
-### Music & Video
+## Appearance Modes
 
-- 🎵 **Native macOS Experience** — Apple Music-style UI with Liquid Glass player bars, clean sidebar navigation, and a source toggle for Music ↔ YouTube
-- 🎧 **YouTube Music Support** — Full playback of DRM-protected YouTube Music content via your existing Premium subscription
-- ▶️ **[YouTube Support](docs/youtube.md)** — Browse regular YouTube recommendations, search, subscriptions, Shorts, Watch Later, history, comments, and video playback with native controls, captions, quality selection, and picture in picture
+<table>
+  <tr>
+    <th width="50%">Dark Mode</th>
+    <th width="50%">Light Mode</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/homescreen-dark.png" alt="Dark Mode"></td>
+    <td><img src="docs/screenshots/homescreen-light.png" alt="Light Mode"></td>
+  </tr>
+</table>
 
-### Playback
+---
 
-- 🎚️ **Equalizer** — System-wide 6-band parametric EQ with Spotify-style presets, applied to WebKit playback output
-- 📜 **Lyrics** — View plain and synced lyrics with line-by-line highlighting when timing data is available, plus AI-powered explanations and mood analysis on macOS 26+
-- 📃 **Queue Management** — View, reorder, shuffle, and clear your playback queue
-- 🔀 **Smart Shuffle** — Beyond plain shuffle: blends suggested tracks into the queue based on what you're playing, with cadence and how many are queued ahead configurable in Settings
-- 🔊 **Background Audio** — Music continues playing when the window is closed; stops on quit
-- 🎶 **Track Notifications** — Get notified when a new track starts playing
+## Key Enhancements & New Architecture
 
-### Library & Discovery
+### Hero Spotlight Stage
+- **Cinematic Artist Backdrop**: High-resolution artist imagery with an organic radial vignette that smoothly blends into the app background.
+- **Multi-Spotlight Carousel**: Curated rotation of heavy-rotation tracks and mixes with one-click direct playback and detail navigation.
 
-- 📚 **Library Access** — Browse playlists, liked songs, and subscribed podcasts; create playlists, add songs to playlists, and delete your own playlists
-- 🧭 **Explore** — Discover new releases, charts, and moods & genres
-- 🎙️ **Podcasts** — Browse and listen to podcasts with episode progress tracking
-- 🔍 **Search** — Find songs, albums, artists, playlists, and podcasts
-- 🕓 **History** — Revisit recently played tracks
+### Jump Back In Bento Grid
+- **Adaptive 1:1 Primary Tile**: Focuses on your most relevant recent session with full-bleed artwork.
+- **Split Interaction Model**: Clicking the album artwork directly triggers playback (replaying from 0:00 if already active); clicking the song title or metadata opens the album or playlist details.
+- **Frosted Quick-Pick Columns**: 3-row horizontal tracks designed with subtle Liquid Glass hover states and balanced layout margins.
 
-### macOS Integration
+<table>
+  <tr>
+    <th width="50%">Jump Back In (Dark Mode)</th>
+    <th width="50%">Jump Back In (Light Mode)</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/jump-back-in-dark.png" alt="Jump Back In Dark"></td>
+    <td><img src="docs/screenshots/jump-back-in-light.png" alt="Jump Back In Light"></td>
+  </tr>
+</table>
 
-- 🎛️ **System Integration** — Now Playing in Control Center, media key support, Dock menu controls
-- ✨ **Apple Intelligence** — On-device AI for natural language commands, lyrics explanations, and playlist refinement on macOS 26+
-- ⌨️ **[Keyboard Shortcuts](docs/keyboard-shortcuts.md)** — Full keyboard control for playback, navigation, and more
-- 📳 **Haptic Feedback** — Tactile feedback on Force Touch trackpads for player controls and navigation
-- 📣 **Share** — Share songs, playlists, albums, and artists via the native macOS share sheet
-- 🌍 **Localized** — UI available in 17 languages (Arabic, Chinese (Simplified), Chinese (Traditional), Dutch, English, French, German, Indonesian, Italian, Korean, Polish, Portuguese, Russian, Spanish, Swedish, Turkish, Ukrainian); change under Settings → General → Language
+### Active Playing Platter & Audio Visualizer
+- **Liquid Glass Platter**: The currently playing song card gets an elevated translucent glass border that reflects the surrounding background without clipping shadows.
+- **Dynamic 3-Dot Visualizer Badge**: A frosted glass pill in the top-left corner with 3 animated audio frequency bars that indicate active playback.
 
-### Automation & Extensibility
+<table>
+  <tr>
+    <th width="50%">Playing Card Platter (Dark Mode)</th>
+    <th width="50%">Playing Card Platter (Light Mode)</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/playing-card-dark.png" alt="Playing Card Dark"></td>
+    <td><img src="docs/screenshots/playing-card-light.png" alt="Playing Card Light"></td>
+  </tr>
+</table>
 
-- 🧩 **[Extensions](docs/extensions.md)** — Load WebKit Web Extensions, including [uBlock Origin Lite](https://github.com/uBlockOrigin/uBOL-home) and [SponsorBlock](https://github.com/ajayyy/SponsorBlock)
-- 🔗 **[URL Scheme](docs/url-scheme.md)** — Open songs directly with `kaset://play?v=VIDEO_ID`; app-targeted YouTube watch and `youtu.be` links play in YouTube mode
-- 🤖 **[AppleScript Support](docs/applescript.md)** — Automate playback with scripts, Raycast, Alfred, and Shortcuts
+### In-Engine Audio Fading
+- **Equal-Power Volume Ramps**: Uses cosine/sine curves for natural acoustic transitions on play, pause, and skip instead of sudden cuts.
+- **Configurable Preferences**: Full duration adjustment directly inside the native Settings panel.
 
-## Requirements
+<table>
+  <tr>
+    <th width="50%">Audio Settings (Dark Mode)</th>
+    <th width="50%">Audio Settings (Light Mode)</th>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/settings-audio-dark.png" alt="Settings Audio Dark"></td>
+    <td><img src="docs/screenshots/settings-audio-light.png" alt="Settings Audio Light"></td>
+  </tr>
+</table>
 
+### Liquid Glass Floating Topbar
+- **Continuous Scroll Blur**: Material mask that softly refracts scrolling content underneath without edge banding or artifacts.
+- **Adaptive Appearance Tint**: Dynamically adjusts between dark and light translucent shades to match macOS system appearance.
+
+<p align="left">
+  <img src="docs/screenshots/topbar-liquid-glass.png" alt="Liquid Glass Topbar" width="850">
+</p>
+
+---
+
+## Core Capabilities
+
+- **DRM-Protected Playback**: Full streaming support for YouTube Music Premium and standard YouTube video feeds.
+- **6-Band Parametric Equalizer**: Audio signal processing with custom presets applied directly to WebKit playback output.
+- **Synchronized Lyrics**: Real-time line-by-line lyric tracking with on-device Apple Intelligence analysis on macOS 26+.
+- **Smart Shuffle**: On-device queue interleaving based on user listening telemetry and taste profile.
+- **System Integration**: Control Center Now Playing widgets, hardware media key listeners, AppleScript automation, and Force Touch haptics.
+- **Web Extension Support**: Native WebKit content blocking for uBlock Origin Lite and SponsorBlock.
+
+---
+
+## Build & Installation
+
+### Requirements
 - macOS 15.4 or later
-- Apple Intelligence features require macOS 26.0 or later
-- [Google](https://accounts.google.com) account for YouTube Music and YouTube personalization
-
-## Installation
-
-### Download
-
-Download the latest release from the [Releases](https://github.com/sozercan/kaset/releases) page.
-
-### Homebrew
+- Xcode 16+ / Swift 6.0+
 
 ```bash
-brew install sozercan/repo/kaset
+# Clone the repository
+git clone https://github.com/httperry/Kaset.git
+cd Kaset
+
+# Build the project
+swift build
+
+# Package and run the native .app bundle
+./Scripts/compile_and_run.sh --debug
 ```
 
-> **Note:** The app is not signed.
-> If you downloaded the app manually, you can clear extended attributes (including quarantine) with:
->
-> ```bash
-> xattr -cr /Applications/Kaset.app
-> ```
+---
 
-## Contributing
+## Credits & License
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture, and coding guidelines.
-
-We welcome AI-assisted contributions! You can submit traditional PRs or **prompt requests** — share the AI prompt that generates your changes, and maintainers can review the intent before running the code. See the [AI-Assisted Contributions](CONTRIBUTING.md#ai-assisted-contributions--prompt-requests) section for details.
-
-## Disclaimer
-
-Kaset is an unofficial application and not affiliated with YouTube or Google Inc. in any way. "YouTube", "YouTube Music" and the "YouTube Logo" are registered trademarks of Google Inc.
+Kaset is an open-source native client.
+- Built by [httperry](https://github.com/httperry) for Hack Club Macondo.
+- Based on the upstream project by [Sertac Ozercan](https://github.com/sozercan/kaset).
