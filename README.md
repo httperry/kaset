@@ -110,6 +110,17 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
   <img src="docs/screenshots/topbar-liquid-glass.png" alt="Liquid Glass Topbar" width="850">
 </p>
 
+### On-Device Cognitive Scoring Model (ACT-R)
+The personalized recommendations and dynamic shelf sorting in Kaset are powered by an on-device cognitive memory model adapted from **ACT-R (Adaptive Control of Thought—Rational)**, evaluating real-time user attention and listening telemetry without sending private telemetry to third-party servers:
+
+$$S(x, t) = \max\left(0, \; (1 - D_x) \cdot \left[ 25 \sum_{k=1}^{n} w_k \, (\Delta t_k)^{-0.5} + 25 \big(25\,\mathbb{I}_{\text{playlist}} + 15\,\mathbb{I}_{\text{liked}}\big) + 0.4\,A_{\text{artist}} + E_{\text{album}} - 10\,N_{\text{skip}} \right] - 1000\,D_x \right)$$
+
+- **Base-Level Activation ($B_i = \sum w_k (\Delta t_k)^{-0.5}$)**: Implements cognitive power-law decay where $\Delta t_k$ is the elapsed hours since listen event $k$, weighted by the attention ratio $w_k = \frac{\text{listened}}{\text{duration}}$ (penalizing quick skips with $w_k = -1.0$).
+- **Spreading Activation ($\mathbb{I}_{\text{playlist}}, \mathbb{I}_{\text{liked}}$)**: Awards $+25$ points for tracks manually added to playlists and $+15$ points for explicit likes.
+- **Long-Term Artist Affinity ($A_{\text{artist}}$)**: Cumulative artist listening points weighted by active vs. background sessions.
+- **Anti-Habituation & Satiation**: Inverted-U exposure decay prevents high-play songs from permanently monopolizing the Hero banner, rotating candidates across app sessions.
+- **Negative Gate ($D_x$)**: Disliked tracks or artists receive $-1000$ to immediately suppress them from all shelves.
+
 ---
 
 ## Core Capabilities
