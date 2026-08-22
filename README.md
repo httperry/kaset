@@ -1,4 +1,6 @@
-# <img src="docs/screenshots/app-icon.png" width="36" height="36" valign="middle"> Kaset — Liquid Glass Topbar
+<img src="docs/screenshots/app-icon.png" width="84" height="84" alt="Kaset App Icon">
+
+# Kaset — Liquid Glass Topbar
 
 A native macOS client for YouTube Music and YouTube with a modern Liquid Glass topbar.
 
