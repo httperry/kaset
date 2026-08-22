@@ -8,7 +8,9 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
 
 ## Video Demonstration
 
-https://github.com/httperry/Kaset/raw/main/docs/screenshots/kaset-homescreen-demo.mp4
+<p align="left">
+  <img src="docs/screenshots/kaset-demo.gif" alt="Kaset Home Redesign Demonstration" width="850">
+</p>
 
 > Full-resolution walkthrough video: [`docs/screenshots/kaset-homescreen-demo.mp4`](docs/screenshots/kaset-homescreen-demo.mp4)
 
