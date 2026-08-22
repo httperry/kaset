@@ -1,6 +1,18 @@
-# <img src="docs/screenshots/app-icon.png" width="40" height="40" valign="middle"> Kaset
+<img src="docs/screenshots/app-icon.png" width="84" height="84" alt="Kaset App Icon">
+
+# Kaset
 
 A native macOS client for YouTube Music and YouTube, built with Swift and SwiftUI.
+
+---
+
+## Video Demonstration
+
+<p align="left">
+  <img src="docs/screenshots/kaset-demo.gif" alt="Kaset Home Redesign Demonstration" width="850">
+</p>
+
+> Full-resolution recording available at [`docs/screenshots/kaset-homescreen-demo.mp4`](docs/screenshots/kaset-homescreen-demo.mp4).
 
 ---
 
