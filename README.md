@@ -1,8 +1,8 @@
 <img src="docs/screenshots/app-icon.png" width="84" height="84" alt="Kaset App Icon">
 
-# Kaset
+# Kaset — Homescreen Redesign
 
-A native macOS client for YouTube Music and YouTube, built with Swift and SwiftUI.
+A complete visual redesign of the Kaset home experience on macOS.
 
 ---
 
@@ -20,16 +20,16 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
 
 <table>
   <tr>
-    <th width="50%">Original Upstream Interface</th>
+    <th width="50%">Previous Interface</th>
     <th width="50%">Redesigned Home Interface</th>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/homescreen-legacy.png" alt="Original Interface"></td>
+    <td><img src="docs/screenshots/homescreen-legacy.png" alt="Previous Interface"></td>
     <td><img src="docs/screenshots/homescreen-dark.png" alt="Redesigned Interface"></td>
   </tr>
   <tr>
     <td valign="top">Standard flat list layout with basic grid carousels.</td>
-    <td valign="top">Cinematic Hero spotlight stage, Jump Back In bento shelf, Liquid Glass playing platters, and real-time audio visualizer.</td>
+    <td valign="top">Redesigned with a hero spotlight carousel, quick-resume Jump Back In shelf, animated audio visualizer, and macOS Liquid Glass styling.</td>
   </tr>
 </table>
 
@@ -50,16 +50,16 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
 
 ---
 
-## Key Enhancements & New Architecture
+## Key Features
 
-### Hero Spotlight Stage
-- **Cinematic Artist Backdrop**: High-resolution artist imagery with an organic radial vignette that smoothly blends into the app background.
-- **Multi-Spotlight Carousel**: Curated rotation of heavy-rotation tracks and mixes with one-click direct playback and detail navigation.
+### Spotlight Hero Stage
+- **Dynamic Artist Backdrops**: Features high-resolution artist artwork with smooth edge fading that naturally blends into the app background.
+- **Featured Carousel**: Quick access to your top rotations and mixes with one-click playback and seamless navigation to album or playlist details.
 
-### Jump Back In Bento Grid
-- **Adaptive 1:1 Primary Tile**: Focuses on your most relevant recent session with full-bleed artwork.
-- **Split Interaction Model**: Clicking the album artwork directly triggers playback (replaying from 0:00 if already active); clicking the song title or metadata opens the album or playlist details.
-- **Frosted Quick-Pick Columns**: 3-row horizontal tracks designed with subtle Liquid Glass hover states and balanced layout margins.
+### Jump Back In Shelf
+- **Recent Highlight Card**: Prominently showcases your most relevant recent session with full-bleed artwork.
+- **Smart Click Actions**: Click the album art to start playing immediately (or restart from 0:00 if already active), or click the title to view the full album or playlist.
+- **Quick-Pick Columns**: Clean 3-row track list with translucent hover highlights for quick listening.
 
 <table>
   <tr>
@@ -72,9 +72,9 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
   </tr>
 </table>
 
-### Active Playing Platter & Audio Visualizer
-- **Liquid Glass Platter**: The currently playing song card gets an elevated translucent glass border that reflects the surrounding background without clipping shadows.
-- **Dynamic 3-Dot Visualizer Badge**: A frosted glass pill in the top-left corner with 3 animated audio frequency bars that indicate active playback.
+### Now Playing Platter & Audio Visualizer
+- **Glass Platter Indicator**: The active song card gently elevates with a translucent glass border to clearly show what's currently playing.
+- **Live Visualizer Badge**: An animated 3-bar audio visualizer pill in the top-left corner indicates active playback in real time.
 
 <table>
   <tr>
@@ -87,75 +87,31 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
   </tr>
 </table>
 
-### In-Engine Audio Fading
-- **Equal-Power Volume Ramps**: Uses cosine/sine curves for natural acoustic transitions on play, pause, and skip instead of sudden cuts.
-- **Configurable Preferences**: Full duration adjustment directly inside the native Settings panel.
+### Smart On-Device Recommendations
+Kaset tailors your home feed and shelf recommendations using an on-device affinity engine. Everything is calculated **100% locally and privately on your Mac**—your listening habits and history never leave your device:
 
-<table>
-  <tr>
-    <th width="50%">Audio Settings (Dark Mode)</th>
-    <th width="50%">Audio Settings (Light Mode)</th>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/settings-audio-dark.png" alt="Settings Audio Dark"></td>
-    <td><img src="docs/screenshots/settings-audio-light.png" alt="Settings Audio Light"></td>
-  </tr>
-</table>
+$$
+S(x, t) = \max\left(0, (1 - D_x) \cdot \left[ 25 \sum_{k=1}^{n} w_k (\Delta t_k)^{-0.5} + 25 \left(25 \, I_{\text{playlist}} + 15 \, I_{\text{liked}}\right) + 0.4 \, A_{\text{artist}} + E_{\text{album}} - 10 \, N_{\text{skip}} \right] - 1000 \, D_x \right)
+$$
 
-### Liquid Glass Floating Topbar
-- **Continuous Scroll Blur**: Material mask that softly refracts scrolling content underneath without edge banding or artifacts.
-- **Adaptive Appearance Tint**: Dynamically adjusts between dark and light translucent shades to match macOS system appearance.
-
-<p align="left">
-  <img src="docs/screenshots/topbar-liquid-glass.png" alt="Liquid Glass Topbar" width="850">
-</p>
-
-### On-Device Cognitive Scoring Model (ACT-R)
-The personalized recommendations and dynamic shelf sorting in Kaset are powered by an on-device cognitive memory model adapted from **ACT-R (Adaptive Control of Thought—Rational)**, evaluating real-time user attention and listening telemetry without sending private telemetry to third-party servers:
-
-$$S(x, t) = \max\left(0, \; (1 - D_x) \cdot \left[ 25 \sum_{k=1}^{n} w_k \, (\Delta t_k)^{-0.5} + 25 \big(25\,\mathbb{I}_{\text{playlist}} + 15\,\mathbb{I}_{\text{liked}}\big) + 0.4\,A_{\text{artist}} + E_{\text{album}} - 10\,N_{\text{skip}} \right] - 1000\,D_x \right)$$
-
-- **Base-Level Activation ($B_i = \sum w_k (\Delta t_k)^{-0.5}$)**: Implements cognitive power-law decay where $\Delta t_k$ is the elapsed hours since listen event $k$, weighted by the attention ratio $w_k = \frac{\text{listened}}{\text{duration}}$ (penalizing quick skips with $w_k = -1.0$).
-- **Spreading Activation ($\mathbb{I}_{\text{playlist}}, \mathbb{I}_{\text{liked}}$)**: Awards $+25$ points for tracks manually added to playlists and $+15$ points for explicit likes.
-- **Long-Term Artist Affinity ($A_{\text{artist}}$)**: Cumulative artist listening points weighted by active vs. background sessions.
-- **Anti-Habituation & Satiation**: Inverted-U exposure decay prevents high-play songs from permanently monopolizing the Hero banner, rotating candidates across app sessions.
-- **Negative Gate ($D_x$)**: Disliked tracks or artists receive $-1000$ to immediately suppress them from all shelves.
+- **Recency & Attention** ($B_i = \sum w_k (\Delta t_k)^{-0.5}$): Tracks you listen to completely receive higher weights than quick skips, while recent plays naturally decay over time ($\Delta t_k$ hours) to keep recommendations fresh.
+- **Explicit Favorites** ($I_{\text{playlist}}, I_{\text{liked}}$): Adding a song to a playlist (+25) or liking it (+15) gives it an immediate priority boost across shelves.
+- **Artist Affinity** ($A_{\text{artist}}$): Tracks from artists you frequently listen to receive a scaled boost across recommendations.
+- **Smart Rotation**: Prevents your top tracks from permanently monopolizing the spotlight, rotating candidates across listening sessions.
+- **Dislike Suppression** ($D_x$): Disliked songs or artists receive a strong penalty ($-1000$) to immediately remove them from all recommendations.
 
 ---
 
-## Core Capabilities
-
-- **DRM-Protected Playback**: Full streaming support for YouTube Music Premium and standard YouTube video feeds.
-- **6-Band Parametric Equalizer**: Audio signal processing with custom presets applied directly to WebKit playback output.
-- **Synchronized Lyrics**: Real-time line-by-line lyric tracking with on-device Apple Intelligence analysis on macOS 26+.
-- **Smart Shuffle**: On-device queue interleaving based on user listening telemetry and taste profile.
-- **System Integration**: Control Center Now Playing widgets, hardware media key listeners, AppleScript automation, and Force Touch haptics.
-- **Web Extension Support**: Native WebKit content blocking for uBlock Origin Lite and SponsorBlock.
-
----
-
-## Build & Installation
-
-### Requirements
-- macOS 15.4 or later
-- Xcode 16+ / Swift 6.0+
+## Building from Source
 
 ```bash
-# Clone the repository
-git clone https://github.com/httperry/Kaset.git
+# Clone the feature branch
+git clone -b redesign/homescreen https://github.com/httperry/Kaset.git
 cd Kaset
 
 # Build the project
 swift build
 
-# Package and run the native .app bundle
+# Package and run the app bundle
 ./Scripts/compile_and_run.sh --debug
 ```
-
----
-
-## Credits & License
-
-Kaset is an open-source native client.
-- Built by [httperry](https://github.com/httperry) for Hack Club Macondo.
-- Based on the upstream project by [Sertac Ozercan](https://github.com/sozercan/kaset).
