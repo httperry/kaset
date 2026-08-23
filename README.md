@@ -114,7 +114,7 @@ A native macOS client for YouTube Music and YouTube, built with Swift and SwiftU
 Kaset tailors your home feed and shelf recommendations using an on-device affinity engine. Everything is calculated **100% locally and privately on your Mac**—your listening habits and history never leave your device:
 
 $$
-S(x, t) = \max\left(0, \; (1 - D_x) \cdot \left[ 25 \sum_{k=1}^{n} w_k (\Delta t_k)^{-0.5} + 25 \left(25 \, I_{\text{playlist}} + 15 \, I_{\text{liked}}\right) + 0.4 \, A_{\text{artist}} + E_{\text{album}} - 10 \, N_{\text{skip}} \right] - 1000 \, D_x \right)
+S(x, t) = \max\left(0, (1 - D_x) \cdot \left[ 25 \sum_{k=1}^{n} w_k (\Delta t_k)^{-0.5} + 25 \left(25 \, I_{\text{playlist}} + 15 \, I_{\text{liked}}\right) + 0.4 \, A_{\text{artist}} + E_{\text{album}} - 10 \, N_{\text{skip}} \right] - 1000 \, D_x \right)
 $$
 
 - **Recency & Attention** ($B_i = \sum w_k (\Delta t_k)^{-0.5}$): Tracks you listen to completely receive higher weights than quick skips, while recent plays naturally decay over time ($\Delta t_k$ hours) to keep recommendations fresh.
