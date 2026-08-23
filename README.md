@@ -1,14 +1,14 @@
 <img src="docs/screenshots/app-icon.png" width="84" height="84" alt="Kaset App Icon">
 
-# Kaset — Liquid Glass Topbar
+# Kaset — Floating Glass Topbar
 
-A native macOS client for YouTube Music and YouTube with a modern Liquid Glass topbar.
+A native macOS client for YouTube Music and YouTube with a modern floating translucent topbar.
 
 ---
 
 ## Overview
 
-The original topbar used a static header that clipped scrolling content. This redesign implements a floating Liquid Glass material layer that lets album art and titles softly refract as they scroll underneath.
+The previous topbar was a static, solid bar that abruptly cut off scrolling content. This update redesigns the top navigation into a floating glass bar that smoothly blurs album art and titles as you scroll underneath.
 
 <p align="left">
   <img src="docs/screenshots/topbar-liquid-glass.png" alt="Liquid Glass Topbar" width="850">
@@ -16,23 +16,25 @@ The original topbar used a static header that clipped scrolling content. This re
 
 ---
 
-## Technical Highlights
+## Key Features
 
-- **Decoupled Blur and Tint**: Separates the background blur material from the color tint gradient, eliminating transparency lines and visual banding.
-- **Dynamic Appearance Adaptation**: Automatically shifts between translucent dark and light tints based on macOS system appearance.
-- **Traffic Light Clearance**: Aligns navigation pills and back buttons with native window controls.
-- **Fullscreen Autohide**: Automatically reveals controls on hover and conceals them during full-bleed fullscreen playback.
+- **Seamless Scroll Blur**: Content smoothly softens as it scrolls beneath the top navigation bar without harsh cutoffs.
+- **Adaptive Theme Tint**: Automatically matches macOS light and dark modes with native translucency.
+- **Native Window Alignment**: Perfectly spaces navigation pills and search controls alongside macOS window buttons.
+- **Fullscreen Auto-Hide**: Hides navigation controls during full-bleed video playback, revealing them smoothly on hover.
 
 ---
 
 ## Building from Source
 
 ```bash
-# Clone the repository
-git clone -b redesign/topbar https://github.com/httperry/Kaset.git
+# Clone the feature branch
+git clone -b topbar-fix https://github.com/httperry/Kaset.git
 cd Kaset
 
-# Build and run
+# Build the project
 swift build
+
+# Package and run the app bundle
 ./Scripts/compile_and_run.sh --debug
 ```
